@@ -1,0 +1,63 @@
+{
+  "name": "shell-kit",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "tools to help make a cli app",
+  "author": "hcl-z 1401859664@qq.com",
+  "license": "MIT",
+  "homepage": "https://github.com/hcl-z/shell-kit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hcl-z/shell-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hcl-z/shell-kit/issues",
+    "email": "1401859664@qq.com"
+  },
+  "keywords": [
+    "cli",
+    "terminal",
+    "node",
+    "pompt",
+    "tool"
+  ],
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix",
+    "release": "bumpp",
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@types/minimist": "^1.2.5",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "configstore": "^6.0.0",
+    "execa": "^9.3.0",
+    "minimist": "^1.2.8",
+    "octokit": "^4.0.2",
+    "shelljs": "^0.8.5",
+    "yaml": "^2.4.5",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^2.21.1",
+    "@biomejs/biome": "^1.1.2",
+    "@types/configstore": "^6.0.2",
+    "@types/node": "^20.14.5",
+    "@types/yargs": "^17.0.32",
+    "bumpp": "^9.4.1",
+    "eslint": "^9.5.0",
+    "tsup": "^7.2.0",
+    "typescript": "^5.2.2",
+    "vitest": "^0.34.4"
+  }
+}
