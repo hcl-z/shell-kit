@@ -1,5 +1,4 @@
 import process from 'node:process'
-import commader from 'commander'
 import args from 'minimist'
 
 interface BaseParseInfo {
@@ -32,16 +31,16 @@ function commandTemplate(usage: string, desc?: string, commands?: string[], opti
 Usage: ${usage}
 ${desc ? `\n${desc}\n` : ''}
 ${commands && commands.length > 0
-? `Commands:
+      ? `Commands:
 
 ${commands.map(c => `  ${c}`).join('\n')}`
-: ''}
+      : ''}
 
 ${options && options.length > 0
-? `Options:
+      ? `Options:
 
 ${options.map(c => `  ${c}`).join('\n')}`
-: ''}
+      : ''}
 `
 }
 
@@ -53,7 +52,7 @@ export class Commander {
     options?: Record<string, (string | boolean | number)>
   } = {}
 
-  constructor() {}
+  constructor() { }
 
   /**
    * @param {object[]} options
@@ -98,7 +97,9 @@ export class Commander {
   }
 
   _formatOptions(options: ParseOption) {
-    if (!options.key) { return '' }
+    if (!options.key) {
+      return ''
+    }
     const { key, alias, default: _d, type = 'boolean', desc, required } = options
     const d = _d !== undefined ? `=${_d}` : ''
     const arg = `${required ? `<${type}${d}>` : `[${type}${d}]`}`

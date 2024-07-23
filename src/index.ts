@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { Command, program } from 'commander'
+import type { Command } from 'commander'
 import { confirm, multiselect, password, select, text } from '@clack/prompts'
 import Configstore from 'configstore'
 import type { PackageJson } from '../types/package'
@@ -29,8 +29,6 @@ interface OptionWithAlias {
   default?: string
   required?: boolean
 }
-
-type Options = (CommandOption | OptionWithAlias)[]
 
 interface OptionConfig {
   notShowCliInfo?: boolean
@@ -96,6 +94,12 @@ interface Config<S extends Record<string, any>> {
   [key: string]: any
 }
 
+type MixinMethods<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : never;
+}
+
+export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno'
+
 export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #pkgJson: PackageJson = {}
   #program: Command | null = null
@@ -106,6 +110,19 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #rootPath: string
   #destPath: string
   #templatePath: string
+  #pkgManager: PackageManager
+
+  static mixin<T extends Record<string, (...args: any[]) => any>>(
+    this: new () => ShellKit,
+    methods: T,
+  ): new () => ShellKit & MixinMethods<T> {
+    Object.entries(methods).forEach(([name, method]) => {
+      (this.prototype as any)[name] = function (this: ShellKit, ...args: any[]) {
+        return method.apply(this, args)
+      }
+    })
+    return this as any
+  }
 
   constructor(config?: Config<S>) {
     this.#config = config
@@ -143,6 +160,11 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
   }
 
+  setPkgManager(pkgManager: PackageManager) {
+    this.#pkgManager = pkgManager
+    this.debugLog('info', 'currentPkgManager change to:', pkgManager)
+  }
+
   setDestPath(destPath: string) {
     this.#destPath = destPath
     this.debugLog('info', 'currentDestPath change to:', destPath)
@@ -167,50 +189,6 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     // await this.#config?.setup?.call(this, this)
     // package
     // end
-  }
-
-  options(options: Options, config?: OptionConfig) {
-    const p = new Command()
-    // show cli info
-    if (!config?.notShowCliInfo) {
-      const { name, description, version } = {
-        name: config?.cliInfo?.name || this.#pkgJson.name,
-        description: config?.cliInfo?.description || this.#pkgJson.description,
-        version: config?.cliInfo?.version || this.#pkgJson.version,
-      }
-      name && p.name(name)
-      description && p.description(description)
-      version && p.version(version)
-    }
-
-    const formatOption = (option: OptionWithAlias) => {
-      const flag = `${option.alias && `-${option.alias},`}--${option.key}`
-
-      if (option.required) {
-        p.requiredOption(flag, option.desc, option.default)
-      }
-      else {
-        p.option(flag, option.desc, option.default)
-      }
-    }
-
-    // add options
-    options.forEach((option) => {
-      if (option.type === 'command') {
-        const command = p.command('clone <source> [destination]')
-        command.action((arg, options) => {
-          // console.log(arg, options)
-          // TODO
-          this.#config?.[`${option.key}Command`]?.apply(this, [arg, options])
-        })
-      }
-      else if (option.type === 'option') {
-        formatOption.apply(p, [option])
-      }
-    })
-
-    console.log('parse')
-    this.#program = p.parse(process.argv)
   }
 
   get Opt() {
@@ -259,6 +237,3 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
   }
 }
-
-export * from './utils/fs'
-export * from './utils/log'

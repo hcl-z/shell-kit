@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { parse, stringify } from 'yaml'
+import { parse } from 'yaml'
 
 export async function readJSON(path: string) {
   try {

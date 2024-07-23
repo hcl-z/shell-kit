@@ -44,6 +44,7 @@
     "execa": "^9.3.0",
     "minimist": "^1.2.8",
     "octokit": "^4.0.2",
+    "pacote": "^18.0.6",
     "shelljs": "^0.8.5",
     "yaml": "^2.4.5",
     "yargs": "^17.7.2"
@@ -53,11 +54,12 @@
     "@biomejs/biome": "^1.1.2",
     "@types/configstore": "^6.0.2",
     "@types/node": "^20.14.5",
+    "@types/pacote": "^11.1.8",
     "@types/yargs": "^17.0.32",
     "bumpp": "^9.4.1",
     "eslint": "^9.5.0",
     "tsup": "^7.2.0",
     "typescript": "^5.2.2",
-    "vitest": "^0.34.4"
+    "vitest": "^2.0.4"
   }
 }

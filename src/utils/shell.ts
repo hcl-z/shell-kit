@@ -1,7 +1,28 @@
+import process from 'node:process'
 import { execa } from 'execa'
+import { Log } from './log'
 
-// Print command's output
-console.log(stdout)
-export function openWithCode(code: string) {
-  const { stdout } = await execa`code`
+export async function openWithCode(path: string) {
+  try {
+    await execa`code ${path}`
+  }
+  catch (error) {
+    if (process.env.debug) {
+      Log.error(`open ${path} failed`, error)
+    }
+  }
+}
+
+export async function runScript() {
+  
+}
+
+export async function install() {
+  // npm 
+
+  // yarn
+
+  // pnpm 
+
+  await execa`pnpm install`
 }

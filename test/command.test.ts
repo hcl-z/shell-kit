@@ -29,8 +29,10 @@ const commandData: ArgsDetail = {
     },
   ],
 }
+
 const commander = new Commander()
-describe('command', () => {
+
+describe('command parse test', () => {
   it('command parse', () => {
     process.argv = ['node', 'index.js', 'install', 'package', '--target', './dir']
     commander.add(commandData)
