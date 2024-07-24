@@ -1,6 +1,8 @@
 import process from 'node:process'
 import chalk from 'chalk'
 
+export const isDebug = process.env.debug
+
 export const Log = {
   warn(...args: any[]) {
     console.log(chalk.bold.bgYellow(' WARN '), ...args)
@@ -16,4 +18,10 @@ export const Log = {
       console.log(chalk.bgRed.bold(' DEBUG ERROR '), ...args)
     }
   },
+}
+
+export function debugLog(type: 'warn' | 'info' | 'error', ...args: any[]) {
+  if (process.env.debug) {
+    Log[type](...args)
+  }
 }

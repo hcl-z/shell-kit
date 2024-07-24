@@ -7,6 +7,7 @@ import { findNearestPackageJson, transformOptions } from './utils'
 import { createStore } from './utils/store'
 import { Log } from './utils/log'
 import { Commander } from './utils/argsParse'
+import { Npm } from './utils/shell'
 
 interface CommandOption {
   type: 'command'
@@ -97,8 +98,7 @@ interface Config<S extends Record<string, any>> {
 type MixinMethods<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : never;
 }
-
-export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno'
+type MixinClass<T extends new (...args: any[]) => any> = InstanceType<T>
 
 export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #pkgJson: PackageJson = {}
@@ -110,7 +110,6 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #rootPath: string
   #destPath: string
   #templatePath: string
-  #pkgManager: PackageManager
 
   static mixin<T extends Record<string, (...args: any[]) => any>>(
     this: new () => ShellKit,
@@ -121,6 +120,22 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
         return method.apply(this, args)
       }
     })
+    return this as any
+  }
+
+  static mixinClass<T extends new (...args: any[]) => any>(
+    this: new () => ShellKit,
+    methods: T[],
+  ): new () => ShellKit & MixinClass<T> {
+    for (const sourceCtor of methods) {
+      for (const name of Object.getOwnPropertyNames(sourceCtor.prototype)) {
+        Object.defineProperty(
+          this.prototype,
+          name,
+          Object.getOwnPropertyDescriptor(sourceCtor.prototype, name) ?? Object.create(null),
+        )
+      }
+    }
     return this as any
   }
 
@@ -160,10 +175,6 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
   }
 
-  setPkgManager(pkgManager: PackageManager) {
-    this.#pkgManager = pkgManager
-    this.debugLog('info', 'currentPkgManager change to:', pkgManager)
-  }
 
   setDestPath(destPath: string) {
     this.#destPath = destPath
@@ -237,3 +248,8 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
   }
 }
+
+const N = ShellKit.mixinClass([Npm])
+
+export * from './utils/fs'
+export * from './utils/log'

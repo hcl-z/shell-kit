@@ -14,15 +14,22 @@ export async function openWithCode(path: string) {
 }
 
 export async function runScript() {
-  
+
 }
 
 export async function install() {
-  // npm 
+  // npm
 
   // yarn
 
-  // pnpm 
+  // pnpm
 
   await execa`pnpm install`
+}
+
+export class Npm {
+  pkgManager = 'pnpm'
+  async install() {
+    await execa`pnpm install`
+  }
 }
