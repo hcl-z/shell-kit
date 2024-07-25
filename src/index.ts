@@ -94,11 +94,14 @@ interface Config<S extends Record<string, any>> {
 
   [key: string]: any
 }
+type UnionToIntersection<U> =
+ (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
 
 type MixinMethods<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : never;
 }
-type MixinClass<T extends new (...args: any[]) => any> = InstanceType<T>
+
+type MixinClass<T extends (new (...args: any[]) => any)[]> = UnionToIntersection<InstanceType<T[number]>>
 
 export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #pkgJson: PackageJson = {}
@@ -123,16 +126,18 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     return this as any
   }
 
-  static mixinClass<T extends new (...args: any[]) => any>(
+  static mixinClass<T extends (new (...args: any[]) => any)[]>(
     this: new () => ShellKit,
-    methods: T[],
+    ...methods: T
   ): new () => ShellKit & MixinClass<T> {
-    for (const sourceCtor of methods) {
-      for (const name of Object.getOwnPropertyNames(sourceCtor.prototype)) {
+    for (const SourceCtor of methods) {
+      const props = Object.getOwnPropertyDescriptors(new SourceCtor())
+      Object.defineProperties(this.prototype, props)
+      for (const name of Object.getOwnPropertyNames(SourceCtor.prototype)) {
         Object.defineProperty(
           this.prototype,
           name,
-          Object.getOwnPropertyDescriptor(sourceCtor.prototype, name) ?? Object.create(null),
+          Object.getOwnPropertyDescriptor(SourceCtor.prototype, name) ?? Object.create(null),
         )
       }
     }
@@ -174,7 +179,6 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
       Log?.[type]?.(...args)
     }
   }
-
 
   setDestPath(destPath: string) {
     this.#destPath = destPath
@@ -248,8 +252,3 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
   }
 }
-
-const N = ShellKit.mixinClass([Npm])
-
-export * from './utils/fs'
-export * from './utils/log'

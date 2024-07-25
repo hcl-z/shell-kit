@@ -3,49 +3,37 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { execa } from 'execa'
 import { Package } from '../src/utils/package'
 
-describe('package', () => {
-  describe('setPkgManager', () => {
-    const packageInstance = new Package()
-    const debugLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    it('should set the package manager', () => {
-      const manager = 'yarn'
-      packageInstance.setPkgManager(manager)
-      expect(packageInstance.pkgManager).toBe(manager)
-    })
-
-    it('should log the package manager change', () => {
-      const manager = 'pnpm'
-      packageInstance.setPkgManager(manager)
-      expect(debugLogSpy).toHaveBeenCalledWith('info', `set pkg manager to ${manager}`)
-    })
+describe('package Manager', () => {
+  vi.mock('execa', () => {
+    return {
+      execa: vi.fn(),
+    }
   })
 
-  describe('runScript', () => {
-    const packageInstance = new Package()
-    it('should run the script using the package manager', async () => {
-      const script = 'test'
-      const stdout = 'Script output'
-      //   vi.mock('execa', () => ({
-      //     default: vi.fn().mockResolvedValue({ stdout }),
-      //   }))
+  it('setPkgManager', () => {
+    const pkg = new Package()
+    expect(pkg.getPackageManager()).toBe('npm')
+    pkg.setPkgManager('yarn')
+    expect(pkg.getPackageManager()).toBe('yarn')
+  })
 
-      await packageInstance.runScript(script)
+  it('run script', () => {
+    const pkg = new Package()
+    pkg.runScript('script')
+    expect(execa).toBeCalledWith('npm', ['run', 'script'])
+    pkg.setPkgManager('yarn')
+    pkg.runScript('script')
+    expect(execa).toBeCalledWith('yarn', ['run', 'script'])
+  })
 
-      expect(execa).toHaveBeenCalledWith(packageInstance.pkgManager, ['run', script])
-      expect(console.log).toHaveBeenCalledWith(stdout)
-    })
-
-    it('should log the error if script execution fails', async () => {
-      const script = 'test'
-      const error = new Error('Script failed')
-      //   vi.mock('execa', () => ({
-      //     default: vi.fn().mockRejectedValue(error),
-      //   }))
-
-      await packageInstance.runScript(script)
-
-      expect((execa as any).default).toHaveBeenCalledWith(packageInstance.pkgManager, ['run', script])
-      expect(console.log).toHaveBeenCalledWith(error)
-    })
+  it('install', () => {
+    const pkg = new Package()
+    pkg.install()
+    expect(execa).toBeCalledWith('npm', ['install'])
+    pkg.setPkgManager('yarn')
+    pkg.install()
+    expect(execa).toBeCalledWith('yarn', [])
+    pkg.install('pkg')
+    expect(execa).toBeCalledWith('yarn', ['add', 'pkg'])
   })
 })

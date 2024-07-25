@@ -1,18 +1,15 @@
 import { execa } from 'execa'
-import { ShellKit, debugLog, logInfo } from '..'
+import { ShellKit } from '..'
+import { debugLog } from './log'
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno' | 'bun'
 
-const runScriptMap = {
-  npm: 'npm run',
-  yarn: 'yarn run',
-  pnpm: 'pnpm run',
-  deno: 'deno run',
-  bun: 'bun run',
-}
-
 export class Package extends ShellKit {
   pkgManager: PackageManager = 'npm'
+  pkg: PackageManager = 'npm'
+  getPackageManager() {
+    return this.pkgManager
+  }
 
   setPkgManager(manager: PackageManager) {
     this.pkgManager = manager
@@ -22,11 +19,26 @@ export class Package extends ShellKit {
   runScript(script: string) {
     debugLog('info', `run script ${script}...`)
     try {
-      const { stdout } = execa(this.pkgManager, ['run', script])
-      console.log(stdout)
+      execa(this.getPackageManager(), ['run', script])
     }
     catch (error) {
-      console.log(error)
+      debugLog('error', error)
+    }
+  }
+
+  install(pkg?: string) {
+    try {
+      if (this.getPackageManager() === 'yarn') {
+        const option = pkg ? ['add', pkg] : []
+        execa('yarn', option)
+      }
+      else {
+        const option = pkg ? ['install', pkg] : ['install']
+        execa(this.getPackageManager(), option)
+      }
+    }
+    catch (error) {
+      debugLog('error', error)
     }
   }
 }
