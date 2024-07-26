@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { readJSON, readYaml } from '../src'
+import { readJSON, readYaml } from '../src/utils/fs'
 
 describe('fs', () => {
   it('readJSON', () => {

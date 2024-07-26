@@ -1,33 +1,45 @@
 import { ShellKit } from '..'
-
+import {copy} from 'fs-extra'
 export class FileSystem extends ShellKit {
-  #to() {
+  #to(from:string) {
+    const self=this
     return {
-      toRoot() {
-
+      to(path:string){
+        copy(from,path)
       },
-      toTemplate() {
-
+      toRoot(path='') {
+        const to=self.getRootPath(path)
+        copy(from,to)
       },
-      toDest() {
-
+      toTemplate(path='') {
+        const to=self.getTemplatePath(path)
+        copy(from,to)
+      },
+      toDest(path='') {
+        const to=self.getDestPath(path)
+        copy(from,to)
       },
     }
   }
 
-  copy() {
-    return this.#to()
+  copy(path:string) {
+    return this.#to(path)
   }
 
-  copyFromRoot() {
-    return this.#to()
+  copyFromRoot(path='') {
+    const from=this.getRootPath(path)
+    return this.#to(from)
   }
 
-  copyFromTemplate() {
-    return this.#to()
+  copyFromTemplate(path='') {
+    const from=this.getTemplatePath(path)
+    return this.#to(from)
   }
 
-  copyFromDest() {
-    return this.#to()
+  copyFromDest(path='') {
+    const from =this.getDestPath(path)
+    return this.#to(from)
   }
+
+  
 }

@@ -8,6 +8,7 @@ import { createStore } from './utils/store'
 import { Log } from './utils/log'
 import { Commander } from './utils/argsParse'
 import { Npm } from './utils/shell'
+import { resolve } from 'node:path'
 
 interface CommandOption {
   type: 'command'
@@ -114,6 +115,18 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
   #destPath: string
   #templatePath: string
 
+  getRootPath(path=''){
+    return resolve(this.#rootPath,path)
+  }
+
+  getDestPath(path=''){
+    return resolve(this.#destPath,path)
+  }
+
+  getTemplatePath(path=''){
+    return resolve(this.#templatePath,path)
+  }
+  
   static mixin<T extends Record<string, (...args: any[]) => any>>(
     this: new () => ShellKit,
     methods: T,
