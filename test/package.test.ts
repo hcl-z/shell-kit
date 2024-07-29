@@ -1,7 +1,7 @@
 import type { MockInstance } from 'vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { execa } from 'execa'
-import { Package } from '../src/utils/package'
+import { Package } from '../src/mixin/package'
 
 describe('package Manager', () => {
   vi.mock('execa', () => {

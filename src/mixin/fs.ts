@@ -40,6 +40,4 @@ export class FileSystem extends ShellKit {
     const from =this.getDestPath(path)
     return this.#to(from)
   }
-
-  
 }

@@ -1,149 +1,91 @@
-import process from 'node:process'
+import process, { config } from 'node:process'
+import { resolve } from 'node:path'
 import type { Command } from 'commander'
 import { confirm, multiselect, password, select, text } from '@clack/prompts'
 import Configstore from 'configstore'
 import type { PackageJson } from '../types/package'
 import { findNearestPackageJson, transformOptions } from './utils'
 import { createStore } from './utils/store'
-import { Log } from './utils/log'
+import { Log, debugLog } from './utils/log'
+import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
-import { Npm } from './utils/shell'
-import { resolve } from 'node:path'
+import { Template } from './mixin/template'
 
-interface CommandOption {
-  type: 'command'
-  key: string
-  desc?: string
-  options: OptionWithAlias[]
-  argument: OptionWithArgument
-}
-
-interface OptionWithArgument {
-  key: string
-  desc?: string
-}
-
-interface OptionWithAlias {
-  type: 'option'
-  key: string
-  desc?: string
-  alias?: string
-  default?: string
-  required?: boolean
-}
-
-interface OptionConfig {
-  notShowCliInfo?: boolean
-  cliInfo?: {
-    name?: string
-    description?: string
-    version?: string
-  }
-}
-
-interface BasePrompt {
-  key: string
-  message: string
-  store?: boolean
-  enabled?: boolean
-}
-interface TextPrompt extends BasePrompt {
-  type: 'text'
-  default?: string
-  placeholder?: string
-  required?: boolean
-  callback?: (value: string) => void
-}
-
-interface PasswordPrompt extends Omit<BasePrompt, 'store'> {
-  type: 'password'
-  mask?: string
-  required?: boolean
-  callback?: (value: string) => void
-}
-
-interface SelectPrompt extends BasePrompt {
-  type: 'select'
-  mulitiple?: boolean
-  default?: string
-  required?: boolean
-  choices: ({
-    label: string
-    value: string
-    description?: string
-  } | string)[]
-  callback?: (value: string | string[]) => void
-}
-
-interface ConfirmPrompt extends BasePrompt {
-  type: 'confirm'
-  active?: string
-  inactive?: string
-  default?: boolean
-  callback?: (value: boolean) => void
-}
-
-type PromptType = TextPrompt | PasswordPrompt | SelectPrompt | ConfirmPrompt
-
-interface Config<S extends Record<string, any>> {
+type Config<S extends Record<string, any>, C extends ArgsDetail, P extends (new (...args: any[]) => any)[] = []> = {
+  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: any
+} & {
+  [K in typeof lifeCycle[number]]?: (ctx: ShellKit<S, C>) => Promise<void>
+} & {
   templatePath?: string
   store?: S
   key?: string
-  prompt?: (ctx: ShellKit<S>) => void
-  setup?: (ctx: ShellKit<S>) => void
-  parseArg?: (ctx: ShellKit<S>) => void
-
-  [key: string]: any
+  plugins?: P
+  subConfig?: (Config<any, any>)[]
+  command?: C
+  parseArg?: (ctx: ShellKit<S, C>) => void
 }
+
 type UnionToIntersection<U> =
  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
 
-type MixinMethods<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : never;
-}
 
 type MixinClass<T extends (new (...args: any[]) => any)[]> = UnionToIntersection<InstanceType<T[number]>>
 
-export class ShellKit<S extends Record<string, any> = Record<string, any>> {
+// 生命周期
+const lifeCycle = [
+  'setup',
+  'beforePrompt',
+  'prompt',
+  'afterPrompt',
+  'beforeCopy',
+  'copy',
+  'afterCopy',
+  'beforeInstall',
+  'install',
+  'afterInstall',
+  'custom',
+  'end',
+] as const
+
+export class ShellKit<S extends Record<string, any> = object, C extends ArgsDetail = object> {
   #pkgJson: PackageJson = {}
   #program: Command | null = null
-  store: S | null = null
+  #config?: Config<S, C>
+  store: S
   localStore: Configstore | null = null
   command: Commander
-  #config?: Config<S>
   #rootPath: string
   #destPath: string
   #templatePath: string
 
-  getRootPath(path=''){
-    return resolve(this.#rootPath,path)
+  getRootPath(path = '') {
+    return resolve(this.#rootPath, path)
   }
 
-  getDestPath(path=''){
-    return resolve(this.#destPath,path)
+  getDestPath(path = '') {
+    return resolve(this.#destPath, path)
   }
 
-  getTemplatePath(path=''){
-    return resolve(this.#templatePath,path)
+  getTemplatePath(path = '') {
+    return resolve(this.#templatePath, path)
   }
-  
-  static mixin<T extends Record<string, (...args: any[]) => any>>(
-    this: new () => ShellKit,
-    methods: T,
-  ): new () => ShellKit & MixinMethods<T> {
-    Object.entries(methods).forEach(([name, method]) => {
-      (this.prototype as any)[name] = function (this: ShellKit, ...args: any[]) {
-        return method.apply(this, args)
-      }
-    })
-    return this as any
-  }
+
+  // static mixin<T extends Record<string, (...args: any[]) => any>>(
+  //   this: new () => ShellKit,
+  //   methods: T,
+  // ): ArrayValueCheck<T, new () => ShellKit & MixinMethods<T>, new () => ShellKit> {
+  //   Object.entries(methods).forEach(([name, method]) => {
+  //     (this.prototype as any)[name] = function (this: ShellKit, ...args: any[]) {
+  //       return method.apply(this, args)
+  //     }
+  //   })
+  //   return this as any
+  // }
 
   static mixinClass<T extends (new (...args: any[]) => any)[]>(
-    this: new () => ShellKit,
-    ...methods: T
-  ): new () => ShellKit & MixinClass<T> {
-    for (const SourceCtor of methods) {
+    plugins: T,
+  ) {
+    for (const SourceCtor of plugins) {
       const props = Object.getOwnPropertyDescriptors(new SourceCtor())
       Object.defineProperties(this.prototype, props)
       for (const name of Object.getOwnPropertyNames(SourceCtor.prototype)) {
@@ -157,11 +99,12 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     return this as any
   }
 
-  constructor(config?: Config<S>) {
+  constructor(config?: Config<S, C>) {
     this.#config = config
     this.#rootPath = this.#destPath = process.cwd()
     this.#templatePath = config?.templatePath || './template'
     this.command = new Commander()
+    this.store = createStore(this.#config?.store)
     this.init().then(() => {
       this.run()
     },
@@ -181,87 +124,38 @@ export class ShellKit<S extends Record<string, any> = Record<string, any>> {
     }
     const json = await findNearestPackageJson()
     this.#pkgJson = json
-    this.store = createStore(this.#config?.store)
+
     if (this.#config?.key || json.name) {
       this.localStore = new Configstore(json.name, initialLocalStore)
     }
   }
 
-  debugLog(type: 'info' | 'warn' | 'error', ...args: any[]) {
-    if (this.Opt?.debug) {
-      Log?.[type]?.(...args)
-    }
-  }
-
   setDestPath(destPath: string) {
     this.#destPath = destPath
-    this.debugLog('info', 'currentDestPath change to:', destPath)
+    debugLog('info', 'currentDestPath change to:', destPath)
   }
 
   setRootPath(rootPath: string) {
     this.#rootPath = rootPath
-    this.debugLog('info', 'currentRootPath change to:', rootPath)
+    debugLog('info', 'currentRootPath change to:', rootPath)
   }
 
   setTemplatePath(templatePath: string) {
     this.#templatePath = templatePath
-    this.debugLog('info', 'currentTemplatePath change to:', templatePath)
+    debugLog('info', 'currentTemplatePath change to:', templatePath)
   }
 
   async run() {
-    // parse
-    await this.#config?.setup?.call(this, this)
-    // prompt
-    await this.#config?.prompt?.call(this, this)
-    // template
-    // await this.#config?.setup?.call(this, this)
-    // package
-    // end
-  }
-
-  get Opt() {
-    return this.#program?.opts()
-  }
-
-  async prompt(promptList: PromptType[]) {
-    for (const item of promptList) {
-      let res
-      switch (item.type) {
-        case 'text':
-          res = await text({
-            message: item.message,
-            placeholder: item.placeholder,
-            defaultValue: item.default,
-          })
-          item?.callback?.(res as string)
-          break
-        case 'password':
-          res = await password({
-            message: item.message,
-            mask: item.mask,
-          })
-          item?.callback?.(res as string)
-          break
-        case 'select':
-          const fn = item.mulitiple ? multiselect : select
-          res = await fn({
-            message: item.message,
-            options: transformOptions(item.choices),
-            initialValue: item.default,
-            required: item.required,
-          })
-          item?.callback?.(res as (string | string[]))
-          break
-        case 'confirm':
-          res = await confirm({
-            message: item.message,
-            active: item.active,
-            inactive: item.inactive,
-            initialValue: item.default,
-          })
-          item?.callback?.(res as boolean)
-          break
+    for await (const name of lifeCycle) {
+      if (this.#config?.[name]) {
+        this.#config?.[name]?.call(this, this)
       }
     }
   }
+}
+
+export default function makeApplication<S extends Record<string, any>, C extends ArgsDetail, P extends (new () => any)[] = [] >(config: Config<S, C, P>) {
+  const { plugins, ...restConfig } = config
+  const NShellKit = ShellKit.mixinClass(config.plugins || [])
+  return new NShellKit(restConfig as Config<Record<string, any>, C, []>) as ShellKit<S, C> & MixinClass<P>
 }

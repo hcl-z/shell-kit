@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { ShellKit } from '../src'
 import { FileSystem } from '../src/mixin/fs'
 import { Npm } from '../src/utils/shell'
-import { Package } from '../src/utils/package'
+import { Package } from '../src/mixin/package'
 
 const NShellKit = ShellKit.mixinClass(Package, FileSystem)
 

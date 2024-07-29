@@ -1,12 +1,13 @@
 import { execa } from 'execa'
 import { ShellKit } from '..'
-import { debugLog } from './log'
+import { debugLog } from '../utils/log'
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno' | 'bun'
 
 export class Package extends ShellKit {
   pkgManager: PackageManager = 'npm'
   pkg: PackageManager = 'npm'
+
   getPackageManager() {
     return this.pkgManager
   }

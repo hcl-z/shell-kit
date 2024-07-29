@@ -22,7 +22,7 @@ export interface ArgsDetail {
       argument?: Omit<BaseParseInfo, 'alias'>
       options?: ParseOption[]
     }
-  }
+  },
   globalOptions?: ParseOption[]
 }
 
