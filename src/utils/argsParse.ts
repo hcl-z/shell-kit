@@ -1,5 +1,6 @@
 import process from 'node:process'
 import args from 'minimist'
+import { ShellKit } from '..'
 
 interface BaseParseInfo {
   key: string
@@ -22,7 +23,7 @@ export interface ArgsDetail {
       argument?: Omit<BaseParseInfo, 'alias'>
       options?: ParseOption[]
     }
-  },
+  }
   globalOptions?: ParseOption[]
 }
 
@@ -52,16 +53,7 @@ export class Commander {
     options?: Record<string, (string | boolean | number)>
   } = {}
 
-  constructor() { }
-
-  /**
-   * @param {object[]} options
-   * @example
-   * [
-   *
-   * ]
-   */
-  add(commands: ArgsDetail) {
+  addParser(commands: ArgsDetail) {
     this.commands = commands
   }
 
