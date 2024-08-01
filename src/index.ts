@@ -10,21 +10,23 @@ import { Log, debugLog } from './utils/log'
 import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
 import { Template } from './mixin/template'
+import { Prompt } from './utils/prompt'
+import { Package } from './mixin/package'
 
-type CommandHandler<S extends Record<string, any>, C extends ArgsDetail> = {
-  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: (ctx: ShellKit<S, C>, args: any) => Promise<void>
+type CommandHandler<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = [] > = {
+  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: (ctx: ShellKit<S, C, P>, args: any) => Promise<void>
 }
 
-type lifeCycleType<S extends Record<string, any> = {}, C extends ArgsDetail = {}> = {
-  [K in typeof lifeCycle[number]]?: (ctx: ShellKit<S, C>) => Promise<void>
+type lifeCycleType<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []> = {
+  [K in typeof lifeCycle[number]]?: (ctx: ShellKit<S, C, P> & MixinClass<P>) => Promise<void>
 }
-type Config<S extends Record<string, any> = {}, C extends ArgsDetail = {}, P extends (new (...args: any[]) => any)[] = []>
-  = CommandHandler<S, C> & lifeCycleType<S, C> & {
+type Config<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []>
+  = CommandHandler<S, C, P> & lifeCycleType<S, C, P> & {
     templatePath?: string
     store?: S
     key?: string
     plugins?: P
-    subConfig?: (Config<any, any>)[]
+    subConfig?: (Config<S, C, P>)[]
     command?: C
     parseArg?: (ctx: ShellKit<S, C>) => void
   }
@@ -51,7 +53,7 @@ const lifeCycle = [
   'end',
 ] as const
 
-export class ShellKit<S extends Record<string, any> = object, C extends ArgsDetail = object> {
+export class ShellKit<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new () => any)[] = []> {
   #pkgJson: PackageJson = {}
   #program: Command | null = null
   #config?: Config<S, C>
@@ -138,17 +140,19 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
   }
 
   async parseArg() {
-    if (!this.command.commands)
+    if (!this.command?.commands) {
       return
+    }
+    console.log('enter=====')
     this.command.parse()
 
-    const command = this.command.parseResult.command
-    const argumant = this.command.parseResult.arguments
+    const command = this.command?.parseResult?.command
+    const argumant = this.command?.parseResult?.arguments
 
     if (command) {
       const handlerName = `on${capitalizeFirstLetter(command)}` as keyof CommandHandler<S, C>
       if (this.#config?.[handlerName]) {
-        const handler = this.#config?.[handlerName] as (ctx: ShellKit<S, C>, ...args: any[]) => void
+        const handler = this.#config?.[handlerName] as (ctx: ShellKit<S, C, P>, ...args: any[]) => void
         await handler(this, argumant)
       }
     }
@@ -169,27 +173,27 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     debugLog('info', 'currentTemplatePath change to:', templatePath)
   }
 
-  #gatherConfig(config: Config): Config[] {
+  #gatherConfig(config: Config<S, C, P>): Config<S, C, P>[] {
     return config?.subConfig?.reduce((arr, config) => {
       if (config) {
         arr.push(config)
       }
-      arr.push(...this.#gatherConfig(config.subConfig || []))
+      config.subConfig?.map(config => arr.push(...this.#gatherConfig(config)))
       return arr
-    }, [config] as Config[]) || []
+    }, [config] as Config<S, C, P>[]) || []
   }
 
   async run() {
     if (!this.#config) {
       return
     }
-    const configs = this.#gatherConfig(this.#config as Config)
+    const configs = this.#gatherConfig(this.#config as Config<S, C, P>)
 
     for await (const name of lifeCycle) {
-      const allHandler: lifeCycleType[(keyof lifeCycleType)][] = []
+      const allHandler: lifeCycleType<S, C, P>[(keyof lifeCycleType<S, C, P>)][] = []
 
-      if (this?.[name as keyof ShellKit]) {
-        allHandler.push(this?.[name as keyof ShellKit] as any)
+      if (this?.[name as keyof ShellKit<S, C, P>]) {
+        allHandler.push(this?.[name as keyof ShellKit<S, C, P>] as any)
       }
 
       configs?.forEach((config) => {
@@ -199,7 +203,7 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
       })
 
       for await (const handler of allHandler) {
-        handler?.(this as ShellKit)
+        handler?.(this as unknown as ShellKit<S, C, P> & MixinClass<P>)
       }
     }
   }
@@ -208,5 +212,20 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
 export default function makeApplication<S extends Record<string, any>, C extends ArgsDetail, P extends (new () => any)[] = [] >(config: Config<S, C, P>) {
   const { plugins, ...restConfig } = config
   const SK = ShellKit.mixinClass(config.plugins || [])
-  return new SK(restConfig as Config<Record<string, any>, C, []>) as ShellKit<S, C> & MixinClass<P>
+  return new SK(restConfig as Config<Record<string, any>, C, P>) as ShellKit<S, C> & MixinClass<P>
 }
+
+const res = makeApplication({
+  plugins: [Prompt, Package, Template],
+  async prompt(ctx) {
+    await ctx.prompt([{
+      type: 'confirm',
+      key: 'confirm',
+      message: '是否继续',
+      default: true,
+    },
+    ])
+  },
+})
+
+// res.run()

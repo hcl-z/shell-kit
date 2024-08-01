@@ -33,6 +33,7 @@
     "release": "bumpp",
     "dev": "tsup --watch",
     "build": "tsup",
+    "start": "npx tsx example/index.ts",
     "test": "vitest",
     "test:ui": "vitest --ui"
   },
