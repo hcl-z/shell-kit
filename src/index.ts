@@ -10,7 +10,7 @@ import { Log, debugLog } from './utils/log'
 import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
 import { Template } from './mixin/template'
-import { Prompt } from './utils/prompt'
+import { Prompt } from './mixin/prompt'
 import { Package } from './mixin/package'
 
 type CommandHandler<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = [] > = {
@@ -41,7 +41,7 @@ const lifeCycle = [
   'setup',
   'parseArg',
   'beforePrompt',
-  'prompt',
+  'doPrompt',
   'afterPrompt',
   'beforeCopy',
   'copy',
@@ -77,7 +77,7 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
   }
 
   get Options() {
-    return this.command.parseResult.options
+    return this.command?.parseResult?.options
   }
   // static mixin<T extends Record<string, (...args: any[]) => any>>(
   //   this: new () => ShellKit,
@@ -114,7 +114,7 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     this.#templatePath = config?.templatePath || './template'
     this.command = new Commander()
     if (config?.command) {
-      this.command.addParser(config.command)
+      this.command?.addParser(config.command)
     }
     this.store = createStore(this.#config?.store)
     this.run()
@@ -143,7 +143,6 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     if (!this.command?.commands) {
       return
     }
-    console.log('enter=====')
     this.command.parse()
 
     const command = this.command?.parseResult?.command
@@ -203,7 +202,7 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
       })
 
       for await (const handler of allHandler) {
-        handler?.(this as unknown as ShellKit<S, C, P> & MixinClass<P>)
+        handler?.call(this, this as unknown as ShellKit<S, C, P> & MixinClass<P>)
       }
     }
   }
@@ -214,18 +213,3 @@ export default function makeApplication<S extends Record<string, any>, C extends
   const SK = ShellKit.mixinClass(config.plugins || [])
   return new SK(restConfig as Config<Record<string, any>, C, P>) as ShellKit<S, C> & MixinClass<P>
 }
-
-const res = makeApplication({
-  plugins: [Prompt, Package, Template],
-  async prompt(ctx) {
-    await ctx.prompt([{
-      type: 'confirm',
-      key: 'confirm',
-      message: '是否继续',
-      default: true,
-    },
-    ])
-  },
-})
-
-// res.run()

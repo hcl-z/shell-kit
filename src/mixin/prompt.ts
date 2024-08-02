@@ -49,7 +49,7 @@ interface ConfirmPrompt extends BasePrompt {
 
 export class Prompt extends ShellKit {
   async prompt(promptList: PromptType[]) {
-    const lastPromptStore = this.localStore?.get('prompt')
+    const lastPromptStore = this?.localStore?.get('prompt')
     const keyStoreValue = lastPromptStore?.key
     for (const item of promptList) {
       let res
