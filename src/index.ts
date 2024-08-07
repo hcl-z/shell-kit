@@ -12,13 +12,14 @@ import { Commander } from './utils/argsParse'
 import { Template } from './mixin/template'
 import { Prompt } from './mixin/prompt'
 import { Package } from './mixin/package'
+import { FileSystem } from './mixin/fs'
 
 type CommandHandler<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = [] > = {
-  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: (ctx: ShellKit<S, C, P>, args: any) => Promise<void>
+  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: (ctx: ShellKitCore<S, C, P>, args: any) => Promise<void>
 }
 
 type lifeCycleType<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []> = {
-  [K in typeof lifeCycle[number]]?: (ctx: ShellKit<S, C, P> & MixinClass<P>) => Promise<void>
+  [K in typeof lifeCycle[number]]?: (ctx: ShellKitCore<S, C, P> & MixinClass<P>) => Promise<void>
 }
 type Config<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []>
   = CommandHandler<S, C, P> & lifeCycleType<S, C, P> & {
@@ -28,7 +29,7 @@ type Config<S extends Record<string, any> = object, C extends ArgsDetail = ArgsD
     plugins?: P
     subConfig?: (Config<S, C, P>)[]
     command?: C
-    parseArg?: (ctx: ShellKit<S, C>) => void
+    parseArg?: (ctx: ShellKitCore<S, C>) => void
   }
 
 type UnionToIntersection<U> =
@@ -53,7 +54,7 @@ const lifeCycle = [
   'end',
 ] as const
 
-export class ShellKit<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new () => any)[] = []> {
+export class ShellKitCore<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new () => any)[] = []> {
   #pkgJson: PackageJson = {}
   #program: Command | null = null
   #config?: Config<S, C>
@@ -63,6 +64,20 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
   #rootPath: string
   #destPath: string
   #templatePath: string
+
+  mixin<T extends new (host: any) => any>(PluginClass: T): this & InstanceType<T> {
+    const pluginInstance = new PluginClass(this)
+    Object.assign(this, pluginInstance)
+    // 复制原型方法
+    for (const name of Object.getOwnPropertyNames(PluginClass.prototype)) {
+      Object.defineProperty(
+        ShellKitCore.prototype,
+        name,
+        Object.getOwnPropertyDescriptor(PluginClass.prototype, name) ?? Object.create(null),
+      )
+    }
+    return this as this & InstanceType<T>
+  }
 
   getRootPath(path = '') {
     return resolve(this.#rootPath, path)
@@ -80,11 +95,11 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     return this.command?.parseResult?.options
   }
   // static mixin<T extends Record<string, (...args: any[]) => any>>(
-  //   this: new () => ShellKit,
+  //   this: new () => ShellKitCore,
   //   methods: T,
-  // ): ArrayValueCheck<T, new () => ShellKit & MixinMethods<T>, new () => ShellKit> {
+  // ): ArrayValueCheck<T, new () => ShellKitCore & MixinMethods<T>, new () => ShellKitCore> {
   //   Object.entries(methods).forEach(([name, method]) => {
-  //     (this.prototype as any)[name] = function (this: ShellKit, ...args: any[]) {
+  //     (this.prototype as any)[name] = function (this: ShellKitCore, ...args: any[]) {
   //       return method.apply(this, args)
   //     }
   //   })
@@ -117,25 +132,14 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
       this.command?.addParser(config.command)
     }
     this.store = createStore(this.#config?.store)
-    this.run()
   }
 
   async setup() {
-    // todo default 收集
-    const initialLocalStore = {
-      default: {
-
-      },
-      // 简单加密
-      secret: {
-
-      },
-    }
     const json = await findNearestPackageJson()
     this.#pkgJson = json
 
     if (this.#config?.key || json.name) {
-      this.localStore = new Configstore(json.name, initialLocalStore)
+      this.localStore = new Configstore(json.name)
     }
   }
 
@@ -151,7 +155,7 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     if (command) {
       const handlerName = `on${capitalizeFirstLetter(command)}` as keyof CommandHandler<S, C>
       if (this.#config?.[handlerName]) {
-        const handler = this.#config?.[handlerName] as (ctx: ShellKit<S, C, P>, ...args: any[]) => void
+        const handler = this.#config?.[handlerName] as (ctx: ShellKitCore<S, C, P>, ...args: any[]) => void
         await handler(this, argumant)
       }
     }
@@ -189,10 +193,11 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
     const configs = this.#gatherConfig(this.#config as Config<S, C, P>)
 
     for await (const name of lifeCycle) {
+      console.log(name)
       const allHandler: lifeCycleType<S, C, P>[(keyof lifeCycleType<S, C, P>)][] = []
 
-      if (this?.[name as keyof ShellKit<S, C, P>]) {
-        allHandler.push(this?.[name as keyof ShellKit<S, C, P>] as any)
+      if (this?.[name as keyof ShellKitCore<S, C, P>]) {
+        allHandler.push(this?.[name as keyof ShellKitCore<S, C, P>] as any)
       }
 
       configs?.forEach((config) => {
@@ -201,8 +206,8 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
         }
       })
 
-      for await (const handler of allHandler) {
-        handler?.call(this, this as unknown as ShellKit<S, C, P> & MixinClass<P>)
+      for (const handler of allHandler) {
+        await handler?.call(this, this as unknown as ShellKitCore<S, C, P> & MixinClass<P>)
       }
     }
   }
@@ -210,6 +215,45 @@ export class ShellKit<S extends Record<string, any> = object, C extends ArgsDeta
 
 export default function makeApplication<S extends Record<string, any>, C extends ArgsDetail, P extends (new () => any)[] = [] >(config: Config<S, C, P>) {
   const { plugins, ...restConfig } = config
-  const SK = ShellKit.mixinClass(config.plugins || [])
-  return new SK(restConfig as Config<Record<string, any>, C, P>) as ShellKit<S, C> & MixinClass<P>
+  const SK = ShellKitCore.mixinClass(config.plugins || [])
+  return new SK(restConfig as Config<Record<string, any>, C, P>) as ShellKitCore<S, C> & MixinClass<P>
 }
+
+class ShellKit<S extends Record<string, any>, C extends ArgsDetail, P extends (new (ctx: ShellKitCore) => any)[] = []> {
+  constructor(
+    public config: Config<S, C, P>,
+  ) {
+    const instance = new ShellKitCore(config)
+    const p = this.#gatherPlugin(config)
+    p.forEach((plugin) => {
+      instance.mixin(plugin)
+    })
+    instance.run()
+  }
+
+  #gatherPlugin(config: Config<S, C, P>) {
+    const plugins: (new (ctx: ShellKitCore) => any)[] = config.plugins || [];
+    (config.subConfig || []).forEach((config) => {
+      // eslint-disable-next-line ts/no-unused-expressions
+      config && plugins.push(...this.#gatherPlugin(config))
+    })
+    return [...new Set(plugins)]
+  }
+}
+
+const e = new ShellKit({
+  plugins: [Template, Package, Prompt],
+  subConfig: [{
+    plugins: [FileSystem, Template],
+  }],
+  doPrompt: async (ctx) => {
+    await ctx.prompt([
+      {
+        type: 'text',
+        key: 'name',
+        message: '请输入项目名称',
+        store: true,
+      },
+    ])
+  },
+})

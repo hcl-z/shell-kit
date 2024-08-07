@@ -6,7 +6,6 @@ import { Prompt } from '../src/mixin/prompt'
 const res = make({
   plugins: [Prompt, Package, Template],
   async doPrompt(ctx) {
-    console.log('ctx', ctx)
     await ctx.prompt([{
       type: 'confirm',
       key: 'confirm',

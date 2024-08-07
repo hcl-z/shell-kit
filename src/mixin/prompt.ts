@@ -1,6 +1,6 @@
 import { confirm, multiselect, password, select, text } from '@clack/prompts'
 import { transformOptions } from '../utils'
-import { ShellKit } from '..'
+import type { ShellKitCore } from '..'
 
 interface BasePrompt {
   key: string
@@ -47,20 +47,25 @@ interface ConfirmPrompt extends BasePrompt {
 
   type PromptType = TextPrompt | PasswordPrompt | SelectPrompt | ConfirmPrompt
 
-export class Prompt extends ShellKit {
+export class Prompt {
+  constructor(public ctx: ShellKitCore) {
+  }
+
   async prompt(promptList: PromptType[]) {
-    const lastPromptStore = this?.localStore?.get('prompt')
-    const keyStoreValue = lastPromptStore?.key
+    const lastPromptStore = this?.ctx?.localStore?.get('prompt')
+
     for (const item of promptList) {
       let res
-      if (!item.enabled) {
+      if (item.enabled === false) {
         continue
       }
+      const keyStoreValue = lastPromptStore?.[item.key]
+
       switch (item.type) {
         case 'text':
           res = await text({
             message: item.message,
-            placeholder: item.placeholder,
+            placeholder: keyStoreValue ?? item.default,
             defaultValue: keyStoreValue ?? item.default,
           })
           break
@@ -86,13 +91,16 @@ export class Prompt extends ShellKit {
             inactive: item.inactive,
             initialValue: keyStoreValue ?? item.default,
           })
-          this.store.prompt[item.key] = res
+          this.ctx.store.prompt[item.key] = res
           item?.callback?.(res as boolean)
           break
       }
 
+      if (typeof res === 'symbol') {
+        return
+      }
       if (item.store) {
-        this.localStore?.set('prompt', {
+        this.ctx.localStore?.set('prompt', {
           ...lastPromptStore,
           [item.key]: res,
         })

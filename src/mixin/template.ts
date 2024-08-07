@@ -1,9 +1,13 @@
 import glob from 'fast-glob'
-import { ShellKit } from '..'
+import type { ShellKitCore } from '..'
 
-export class Template extends ShellKit {
+export class Template {
   _excludeGlob: string[] = []
   _includeGlob: string[] = []
+
+  constructor(public ctx: ShellKitCore) {
+  }
+
   excludeTemFile(glob: string | string[]) {
     if (typeof glob === 'string') {
       this._excludeGlob.push(glob)
@@ -23,7 +27,7 @@ export class Template extends ShellKit {
   }
 
   validate() {
-    const templatePath = this.getTemplatePath()
+    const templatePath = this.ctx.getTemplatePath()
 
     if (!templatePath) {
       return

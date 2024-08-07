@@ -1,12 +1,16 @@
 import { execa } from 'execa'
-import { ShellKit } from '..'
+import type { ShellKitCore } from '..'
 import { debugLog } from '../utils/log'
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno' | 'bun'
 
-export class Package extends ShellKit {
+export class Package {
   pkgManager: PackageManager = 'npm'
   pkg: PackageManager = 'npm'
+
+  constructor(public ctx: ShellKitCore) {
+
+  }
 
   getPackageManager() {
     return this.pkgManager
