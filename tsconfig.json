@@ -5,7 +5,9 @@
     "moduleResolution": "Node",
     "types": ["vitest/globals"],
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "strictFunctionTypes": true
   },
   "include": ["src"]
 }

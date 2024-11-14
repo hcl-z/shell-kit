@@ -1,9 +1,9 @@
-import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { parse } from 'yaml'
 
-export async function readJSON(path: string) {
+export function readJSON(path: string) {
   try {
-    const str = await readFile(path, 'utf8')
+    const str = readFileSync(path, 'utf8')
     return JSON.parse(str)
   }
   catch (error) {
@@ -11,9 +11,9 @@ export async function readJSON(path: string) {
   }
 }
 
-export async function readYaml(path: string) {
+export function readYaml(path: string) {
   try {
-    const file = await readFile(path, 'utf8')
+    const file = readFileSync(path, 'utf8')
     return parse(file)
   }
   catch (error) {

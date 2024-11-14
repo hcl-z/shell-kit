@@ -1,19 +1,16 @@
 import { copy } from 'fs-extra'
-import type { ShellKitCore } from '..'
+import { BasePlugin } from '../core/base-plugin'
 
-export class FileSystem {
-  constructor(public ctx: ShellKitCore) {
-  }
+export class FileSystem extends BasePlugin {
 
   _to(from: string) {
-    // eslint-disable-next-line ts/no-this-alias
     const self = this
     return {
       to(path: string) {
         copy(from, path)
       },
       toRoot(path = '') {
-        const to = self.ctx.getRootPath(path)
+        const to = self.getRootPath(path)
         copy(from, to)
       },
       toTemplate(path = '') {

@@ -1,12 +1,10 @@
 import glob from 'fast-glob'
-import type { ShellKitCore } from '..'
+import { BasePlugin } from '../core/base-plugin'
+import { debugLog } from '../utils/log'
 
-export class Template {
+export class Template extends BasePlugin {
   _excludeGlob: string[] = []
   _includeGlob: string[] = []
-
-  constructor(public ctx: ShellKitCore) {
-  }
 
   excludeTemFile(glob: string | string[]) {
     if (typeof glob === 'string') {
@@ -26,9 +24,8 @@ export class Template {
     }
   }
 
-  validate() {
+  matchFiles() {
     const templatePath = this.ctx.getTemplatePath()
-
     if (!templatePath) {
       return
     }
@@ -39,5 +36,22 @@ export class Template {
 
     })
     return files
+  }
+
+  copy({
+    silent = true,
+  }: {
+    silent?: boolean
+  }) {
+    const fileLists = this.matchFiles();
+    (fileLists || []).forEach((file) => {
+      if (file.endsWith('.template')) {
+
+      }
+      const from = this.ctx.getTemplatePath(file)
+      const to = this.ctx.getDestPath(file)
+
+
+    })
   }
 }

@@ -1,53 +1,85 @@
-const { Init, ShellKit, readJSON, Log } = require('../dist/index')
-
+import { ShellKit, defineConfig } from '../dist/index.js'
+import { Prompt, Package, CommandMixin } from '../dist/mixin/index.js'
+import { validateNpmName } from '../dist/utils/index.js'
+import prompts from './prompts/index.js'
+// 使用示例
 async function main() {
-  new ShellKit({
-    store: {
-      a: {
-        b: {
-          c: {},
-          d: [],
-        },
-      },
+  const shell = await ShellKit.create(defineConfig({}))
+    .then(instance => instance.mixin([Prompt, Package, CommandMixin]))
+
+  shell.addCommand({
+    id: 'build',
+    name: 'build',
+    description: '构建项目',
+    callback: (...rest) => {
+      console.log('build', rest);
+    }
+  })
+
+  shell.addCommand({
+    id: 'serve',
+    name: 'serve',
+    description: '启动服务器',
+    callback: (...rest) => {
+      console.log('serve', rest);
+    }
+  })
+
+  await shell.parse()
+
+  console.log(shell.resolvePrompts(prompts));
+  await shell.prompt([{
+    name: 'name',
+    type: 'text',
+    message: '请输入项目名称',
+    validate: validateNpmName(),
+    callback: (value) => {
+      console.log('name', value);
+    }
+  }, {
+    name: 'description',
+    message: 'Description',
+    type: 'text',
+    callback: (value) => {
+      console.log('description', value);
+    }
+  }, {
+    name: 'userName',
+    message: 'Author\'s Name',
+    initial: shell.localInfo.user,
+    store: true,
+    type: 'text',
+  }, {
+    name: 'repository',
+    message: 'Repository',
+    initial: (prev, store) => {
+      return `https://github.com/${prev}/${store?.['name']}`
     },
-    doCommand(argument, ctx) {
-      console.log(argument)
-    },
-    setup: async (ctx) => {
-      ctx.options([
-        { type: 'command', key: 'crrr', desc: 'command', options: [], argument: { key: 'a', desc: 'argument' } },
-        { type: 'option', key: 'alia', desc: 'option', alias: 'a', default: 'b' },
-      ])
-      // ctx.store['a.b.c'].gg = 'bound'
-      // ctx.store['a.b.d'].push('Next')
-      // // d.push(1)
-      // console.log(JSON.stringify(ctx.store))
-      // console.log(this)
-      ctx.prompt([
-        { type: 'text', message: 'text', placeholder: 'text', callback: value => Log.warn(value) },
-        { type: 'password', message: 'password', mask: '-' },
-        { type: 'select', message: 'select', choices: ['a', 'b', 'c'] },
-        { type: 'select', message: 'Mulitselect', mulitiple: true, choices: ['a', 'b', 'c'] },
-        { type: 'confirm', message: 'confirm', active: 'yes', inactive: 'no' },
-      ])
-    },
-    // prompt: (ctx) => {
-    //   console.log(ctx.store)
-    //   ctx.store['nihao.yy'] = 4
-    //   console.log(ctx.store['nihao.yy'])
-    //   ctx.prompt([
-    //     { type: 'text', message: 'text', placeholder: 'text' },
-    //     { type: 'password', message: 'password', mask: '-' },
-    //     { type: 'select', message: 'select', choices: ['a', 'b', 'c'] },
-    //     { type: 'select', message: 'Mulitselect', mulitiple: true, choices: ['a', 'b', 'c'] },
-    //     { type: 'confirm', message: 'confirm', active: 'yes', inactive: 'no' },
-    //   ])
-    // },
-  }).run()
-  // l.options([
-  //   { type: 'command', key: 'crrr', desc: 'command', options: [], argument: { key: 'a', desc: 'argument' } },
-  //   { type: 'option', key: 'alia', desc: 'option', alias: 'a', default: 'b' },
-  // ])
+  },
+  {
+    name: 'keywords',
+    message: 'keywords(split by space)',
+    initial: '',
+  },
+  {
+    name: 'pkgManager',
+    type: 'select',
+    message: 'which Pkg Manager do you want to use?',
+    initial: 1,
+    choices: [{
+      title: 'npm',
+      value: 'npm',
+    }, {
+      title: 'yarn',
+      value: 'yarn',
+    }, {
+      title: 'pnpm',
+      value: 'pnpm',
+    }],
+    store: true,
+  },
+  ...shell.resolvePrompts(prompts)
+  ])
 }
 
 main()

@@ -1,19 +1,17 @@
 import { execa } from 'execa'
-import type { ShellKitCore } from '..'
+import { BasePlugin } from '../core/base-plugin'
 import { debugLog } from '../utils/log'
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno' | 'bun'
 
-export class Package {
+
+export class Package extends BasePlugin {
   pkgManager: PackageManager = 'npm'
-  pkg: PackageManager = 'npm'
-
-  constructor(public ctx: ShellKitCore) {
-
-  }
 
   getPackageManager() {
     return this.pkgManager
+  }
+  addCommand() {
   }
 
   setPkgManager(manager: PackageManager) {
@@ -21,10 +19,13 @@ export class Package {
     debugLog('info', `set pkg manager to ${manager}`)
   }
 
-  runScript(script: string) {
+  async runScript(script: string) {
     debugLog('info', `run script ${script}...`)
     try {
-      execa(this.getPackageManager(), ['run', script])
+      await execa(this.getPackageManager(), ['run', script], {
+        stdout: 'inherit',
+        stderr: 'inherit',
+      })
     }
     catch (error) {
       debugLog('error', error)
@@ -35,11 +36,15 @@ export class Package {
     try {
       if (this.getPackageManager() === 'yarn') {
         const option = pkg ? ['add', pkg] : []
-        execa('yarn', option)
+        execa('yarn', option, {
+          stdout: 'inherit',
+        })
       }
       else {
         const option = pkg ? ['install', pkg] : ['install']
-        execa(this.getPackageManager(), option)
+        execa(this.getPackageManager(), option, {
+          stdout: 'inherit',
+        })
       }
     }
     catch (error) {

@@ -3,7 +3,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { readJSON } from './utils/fs'
 
-export async function findNearestPackageJson(scriptPath: string = process.cwd()) {
+export function findNearestPackageJson(scriptPath: string = process.cwd()) {
   let currentDir = scriptPath
   while (currentDir !== path.parse(currentDir).root) {
     const packageJsonPath = path.join(currentDir, 'package.json')

@@ -35,24 +35,24 @@ const commander = new Commander()
 describe('command parse test', () => {
   it('command parse', () => {
     process.argv = ['node', 'index.js', 'install', 'package', '--target', './dir']
-    commander.add(commandData)
+    commander.addParser(commandData)
     commander.parse()
   })
 
   it('command parse Error', () => {
     process.argv = ['node', 'index.js', 'nonCommand']
-    commander.add(commandData)
+    commander.addParser(commandData)
     expect(commander.parse.bind(commander)).toThrowError('command nonCommand not found')
   })
   it('argument parse Error', () => {
     process.argv = ['node', 'index.js', 'install']
-    commander.add(commandData)
+    commander.addParser(commandData)
     expect(commander.parse.bind(commander)).toThrowError('command install requires an argument')
   })
 
   it('option parse Error', () => {
     process.argv = ['node', 'index.js', 'install', 'llll', '-o']
-    commander.add(commandData)
+    commander.addParser(commandData)
     expect(commander.parse.bind(commander)).toThrowError('command option target requires an argument')
   })
 })

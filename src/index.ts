@@ -1,259 +1,236 @@
-import process, { config } from 'node:process'
 import { resolve } from 'node:path'
-import type { Command } from 'commander'
-import { confirm, multiselect, password, select, text } from '@clack/prompts'
 import Configstore from 'configstore'
 import type { PackageJson } from '../types/package'
-import { capitalizeFirstLetter, findNearestPackageJson, transformOptions } from './utils'
+import { capitalizeFirstLetter, findNearestPackageJson } from './utils'
 import { createStore } from './utils/store'
-import { Log, debugLog } from './utils/log'
+import { debugLog } from './utils/log'
 import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
-import { Template } from './mixin/template'
-import { Prompt } from './mixin/prompt'
+import { ExtendPromptObject, Prompt } from './mixin/prompt'
 import { Package } from './mixin/package'
-import { FileSystem } from './mixin/fs'
+import { CommandMixin } from './mixin/command'
+import { BasePlugin } from './core/base-plugin'
+import { validateNpmName } from './utils/validate'
+import npmName from 'npm-name'
+import { getGitInfo } from './utils/fetch'
 
-type CommandHandler<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = [] > = {
-  [K in keyof C['command'] as `on${Capitalize<string & K>}`]?: (ctx: ShellKitCore<S, C, P>, args: any) => Promise<void>
-}
-
-type lifeCycleType<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []> = {
-  [K in typeof lifeCycle[number]]?: (ctx: ShellKitCore<S, C, P> & MixinClass<P>) => Promise<void>
-}
-type Config<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new (...args: any[]) => any)[] = []>
-  = CommandHandler<S, C, P> & lifeCycleType<S, C, P> & {
-    templatePath?: string
-    store?: S
-    key?: string
-    plugins?: P
-    subConfig?: (Config<S, C, P>)[]
-    command?: C
-    parseArg?: (ctx: ShellKitCore<S, C>) => void
-  }
-
+/**
+ * 将联合类型转换为交叉类型的工具类型
+ */
 type UnionToIntersection<U> =
- (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
+  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
 
-type MixinClass<T extends (new (...args: any[]) => any)[]> = UnionToIntersection<InstanceType<T[number]>>
 
-// 生命周期
-const lifeCycle = [
-  'setup',
-  'parseArg',
-  'beforePrompt',
-  'doPrompt',
-  'afterPrompt',
-  'beforeCopy',
-  'copy',
-  'afterCopy',
-  'beforeInstall',
-  'install',
-  'afterInstall',
-  'custom',
-  'end',
-] as const
+/**
+ * 插件类型定义
+ */
+export type Plugin = {
+  new(ctx: ShellKit): BasePlugin
+}
 
-export class ShellKitCore<S extends Record<string, any> = object, C extends ArgsDetail = ArgsDetail, P extends (new () => any)[] = []> {
-  #pkgJson: PackageJson = {}
-  #program: Command | null = null
-  #config?: Config<S, C>
-  store: S
-  localStore: Configstore | null = null
-  command: Commander
-  #rootPath: string
-  #destPath: string
-  #templatePath: string
+/**
+ * 获取插件实例类型的工具类型
+ */
+type PluginInstance<T extends Plugin> = T extends new (ctx: any) => infer R ? R : never
 
-  mixin<T extends new (host: any) => any>(PluginClass: T): this & InstanceType<T> {
-    const pluginInstance = new PluginClass(this)
-    Object.assign(this, pluginInstance)
-    // 复制原型方法
-    for (const name of Object.getOwnPropertyNames(PluginClass.prototype)) {
-      Object.defineProperty(
-        ShellKitCore.prototype,
-        name,
-        Object.getOwnPropertyDescriptor(PluginClass.prototype, name) ?? Object.create(null),
-      )
+/**
+ * 合并多个插件的方法类型
+ */
+type MergePlugins<T extends readonly Plugin[]> = UnionToIntersection<{
+  [K in keyof T]: PluginInstance<T[K]>
+}[number]>
+
+/**
+ * ShellKit 配置接口
+ */
+export interface ShellKitConfig<
+  P extends readonly Plugin[],
+  S extends Record<string, any> = any,
+  C extends ArgsDetail = ArgsDetail,
+> {
+  /** 插件列表 */
+  plugins?: P
+  /** 全局存储 */
+  store?: S
+  /** 命令配置 */
+  command?: C
+  /** 模板路径 */
+  templatePath?: string
+  /** 配置存储键名 */
+  key?: string
+}
+
+/**
+ * 完整的上下文类型（包含插件方法）
+ */
+export type FullContext<
+  P extends readonly Plugin[],
+  S extends Record<string, any> = any,
+> = MergePlugins<P> & { store: S }
+
+/**
+ * ShellKit 核心类
+ * 提供插件系统和基础功能
+ */
+export class ShellKit<
+  P extends readonly Plugin[] = [],
+  S extends Record<string, any> = any,
+  C extends ArgsDetail = ArgsDetail,
+> {
+  /** 全局存储 */
+  public store: any
+  /** 本地配置存储 */
+  public localStore: Configstore | null
+  /** 命令行解析器 */
+  public command: Commander
+  /** 项目根路径 */
+  public rootPath: string
+  /** 本地信息 */
+  public localInfo: {
+    user: string
+    email: string
+  } = {
+      user: '',
+      email: '',
     }
-    return this as this & InstanceType<T>
-  }
+  /** 目标输出路径 */
+  destPath: string
+  /** 模板文件路径 */
+  templatePath: string
+  /** package.json 内容 */
+  pkgJson: PackageJson
 
-  getRootPath(path = '') {
-    return resolve(this.#rootPath, path)
-  }
-
-  getDestPath(path = '') {
-    return resolve(this.#destPath, path)
-  }
-
-  getTemplatePath(path = '') {
-    return resolve(this.#templatePath, path)
-  }
-
-  get Options() {
-    return this.command?.parseResult?.options
-  }
-  // static mixin<T extends Record<string, (...args: any[]) => any>>(
-  //   this: new () => ShellKitCore,
-  //   methods: T,
-  // ): ArrayValueCheck<T, new () => ShellKitCore & MixinMethods<T>, new () => ShellKitCore> {
-  //   Object.entries(methods).forEach(([name, method]) => {
-  //     (this.prototype as any)[name] = function (this: ShellKitCore, ...args: any[]) {
-  //       return method.apply(this, args)
-  //     }
-  //   })
-  //   return this as any
-  // }
-
-  static mixinClass<T extends (new (...args: any[]) => any)[]>(
-    plugins: T,
-  ) {
-    for (const SourceCtor of plugins) {
-      const props = Object.getOwnPropertyDescriptors(new SourceCtor())
-      Object.defineProperties(this.prototype, props)
-      for (const name of Object.getOwnPropertyNames(SourceCtor.prototype)) {
-        Object.defineProperty(
-          this.prototype,
-          name,
-          Object.getOwnPropertyDescriptor(SourceCtor.prototype, name) ?? Object.create(null),
-        )
-      }
-    }
-    return this as any
-  }
-
-  constructor(config?: Config<S, C>) {
-    this.#config = config
-    this.#rootPath = this.#destPath = process.cwd()
-    this.#templatePath = config?.templatePath || './template'
+  private constructor(private config: ShellKitConfig<P, S, C>) {
+    this.store = createStore(this.config.store || {} as S)
+    this.localStore = null
     this.command = new Commander()
-    if (config?.command) {
-      this.command?.addParser(config.command)
-    }
-    this.store = createStore(this.#config?.store)
+    this.rootPath = process.cwd()
+    this.destPath = process.cwd()
+    this.templatePath = this.config.templatePath || './template'
+    this.pkgJson = {}
+    this.initStore()
   }
 
-  async setup() {
-    const json = await findNearestPackageJson()
-    this.#pkgJson = json
+  public static async create<
+    P extends readonly Plugin[] = [],
+    S extends Record<string, any> = any,
+    C extends ArgsDetail = ArgsDetail
+  >(config: ShellKitConfig<P, S, C>): Promise<ShellKit<P, S, C>> {
+    const instance = new ShellKit(config)
+    await instance.asyncInit()
+    return instance
+  }
 
-    if (this.#config?.key || json.name) {
+  private async asyncInit() {
+    this.localInfo = await getGitInfo()
+  }
+
+
+  /**
+   * 获取根路径
+   */
+  getRootPath(path = '') {
+    return resolve(this.rootPath, path)
+  }
+
+  /**
+   * 获取目标路径
+   */
+  getDestPath(path = '') {
+    return resolve(this.destPath, path)
+  }
+
+  /**
+   * 获取模板路径
+   */
+  getTemplatePath(path = '') {
+    return resolve(this.templatePath, path)
+  }
+
+  /**
+   * 设置根路径
+   */
+  setRootPath(path: string) {
+    this.rootPath = path
+    debugLog('info', 'currentRootPath change to:', path)
+  }
+
+  /**
+   * 设置目标路径
+   */
+  setDestPath(path: string) {
+    this.destPath = path
+    debugLog('info', 'currentDestPath change to:', path)
+  }
+
+  /**
+   * 设置模板路径
+   */
+  setTemplatePath(path: string) {
+    this.templatePath = path
+    debugLog('info', 'currentTemplatePath change to:', path)
+  }
+
+  /**
+   * 初始化存储
+   */
+  private initStore() {
+    const json = findNearestPackageJson()
+    this.pkgJson = json
+
+    if (this.config.key || json.name) {
       this.localStore = new Configstore(json.name)
     }
   }
 
-  async parseArg() {
-    if (!this.command?.commands) {
-      return
-    }
-    this.command.parse()
-
-    const command = this.command?.parseResult?.command
-    const argumant = this.command?.parseResult?.arguments
-
-    if (command) {
-      const handlerName = `on${capitalizeFirstLetter(command)}` as keyof CommandHandler<S, C>
-      if (this.#config?.[handlerName]) {
-        const handler = this.#config?.[handlerName] as (ctx: ShellKitCore<S, C, P>, ...args: any[]) => void
-        await handler(this, argumant)
-      }
-    }
+  /**
+   * 解析 prompt 配置
+   */
+  resolvePrompts(prompts: Array<(ctx: ShellKit<P, S, C>) => any>) {
+    return prompts.map(p => p(this as unknown as ShellKit<P, S, C>)).flat()
   }
 
-  setDestPath(destPath: string) {
-    this.#destPath = destPath
-    debugLog('info', 'currentDestPath change to:', destPath)
-  }
+  /**
+   * 动态混入插件
+   * @param plugins 要混入的插件数组
+   * @returns 混入插件后的实例，包含新插件的方法
+   */
+  mixin<NewP extends readonly Plugin[]>(
+    plugins: NewP
+  ): ShellKit<[...P, ...NewP], S, C> & MergePlugins<[...P, ...NewP]> {
+    const newPlugins = plugins.map(Plugin => new Plugin(this as unknown as ShellKit<[], any, ArgsDetail>))
+    const pluginMethods = newPlugins.reduce((acc, plugin) => {
+      const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(plugin))
+        .filter(name => name !== 'constructor')
+        .reduce((_acc, name) => {
+          if (name in acc || name in this) {
+            console.warn(`警告: 方法 "${name}" 已经存在，将被覆盖`)
+          }
+          _acc[name] = plugin[name].bind(plugin)
+          return _acc
+        }, {} as Record<string, any>)
+      return { ...acc, ...methods }
+    }, {})
 
-  setRootPath(rootPath: string) {
-    this.#rootPath = rootPath
-    debugLog('info', 'currentRootPath change to:', rootPath)
-  }
+    Object.assign(this, pluginMethods)
 
-  setTemplatePath(templatePath: string) {
-    this.#templatePath = templatePath
-    debugLog('info', 'currentTemplatePath change to:', templatePath)
-  }
-
-  #gatherConfig(config: Config<S, C, P>): Config<S, C, P>[] {
-    return config?.subConfig?.reduce((arr, config) => {
-      if (config) {
-        arr.push(config)
-      }
-      config.subConfig?.map(config => arr.push(...this.#gatherConfig(config)))
-      return arr
-    }, [config] as Config<S, C, P>[]) || []
-  }
-
-  async run() {
-    if (!this.#config) {
-      return
-    }
-    const configs = this.#gatherConfig(this.#config as Config<S, C, P>)
-
-    for await (const name of lifeCycle) {
-      console.log(name)
-      const allHandler: lifeCycleType<S, C, P>[(keyof lifeCycleType<S, C, P>)][] = []
-
-      if (this?.[name as keyof ShellKitCore<S, C, P>]) {
-        allHandler.push(this?.[name as keyof ShellKitCore<S, C, P>] as any)
-      }
-
-      configs?.forEach((config) => {
-        if (config?.[name]) {
-          allHandler.push(config[name])
-        }
-      })
-
-      for (const handler of allHandler) {
-        await handler?.call(this, this as unknown as ShellKitCore<S, C, P> & MixinClass<P>)
-      }
-    }
+    return this as ShellKit<[...P, ...NewP], S, C> & MergePlugins<[...P, ...NewP]>
   }
 }
 
-export default function makeApplication<S extends Record<string, any>, C extends ArgsDetail, P extends (new () => any)[] = [] >(config: Config<S, C, P>) {
-  const { plugins, ...restConfig } = config
-  const SK = ShellKitCore.mixinClass(config.plugins || [])
-  return new SK(restConfig as Config<Record<string, any>, C, P>) as ShellKitCore<S, C> & MixinClass<P>
+/**
+ * 配置辅助函数
+ * 用于创建类型安全的配置对象
+ */
+export function defineConfig<
+  P extends readonly Plugin[],
+  S extends Record<string, any> = any,
+  C extends ArgsDetail = ArgsDetail,
+>(config: ShellKitConfig<P, S, C>): ShellKitConfig<P, S, C> {
+  return config
 }
 
-class ShellKit<S extends Record<string, any>, C extends ArgsDetail, P extends (new (ctx: ShellKitCore) => any)[] = []> {
-  constructor(
-    public config: Config<S, C, P>,
-  ) {
-    const instance = new ShellKitCore(config)
-    const p = this.#gatherPlugin(config)
-    p.forEach((plugin) => {
-      instance.mixin(plugin)
-    })
-    instance.run()
-  }
 
-  #gatherPlugin(config: Config<S, C, P>) {
-    const plugins: (new (ctx: ShellKitCore) => any)[] = config.plugins || [];
-    (config.subConfig || []).forEach((config) => {
-      // eslint-disable-next-line ts/no-unused-expressions
-      config && plugins.push(...this.#gatherPlugin(config))
-    })
-    return [...new Set(plugins)]
-  }
-}
 
-const e = new ShellKit({
-  plugins: [Template, Package, Prompt],
-  subConfig: [{
-    plugins: [FileSystem, Template],
-  }],
-  doPrompt: async (ctx) => {
-    await ctx.prompt([
-      {
-        type: 'text',
-        key: 'name',
-        message: '请输入项目名称',
-        store: true,
-      },
-    ])
-  },
-})
+
+

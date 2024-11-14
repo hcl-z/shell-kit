@@ -1,6 +1,6 @@
 import process from 'node:process'
 import args from 'minimist'
-import { ShellKit } from '..'
+import cliui from 'cliui'
 
 interface BaseParseInfo {
   key: string
@@ -16,33 +16,34 @@ interface ParseOption extends Omit<BaseParseInfo, 'default'> {
 }
 
 export interface ArgsDetail {
-  command?: {
-    [key: string]: {
-      desc?: string
-      alias?: string
-      argument?: Omit<BaseParseInfo, 'alias'>
-      options?: ParseOption[]
-    }
-  }
+  command?: Record<string, {
+    desc?: string
+    alias?: string
+    argument?: Omit<BaseParseInfo, 'alias'>
+    options?: ParseOption[]
+  }>
   globalOptions?: ParseOption[]
 }
 
 function commandTemplate(usage: string, desc?: string, commands?: string[], options?: string[]) {
-  return `
-Usage: ${usage}
-${desc ? `\n${desc}\n` : ''}
-${commands && commands.length > 0
-      ? `Commands:
-
-${commands.map(c => `  ${c}`).join('\n')}`
-      : ''}
-
-${options && options.length > 0
-      ? `Options:
-
-${options.map(c => `  ${c}`).join('\n')}`
-      : ''}
-`
+  const ui = cliui({ width: 80 })
+  ui.div({ padding: [0, 0, 1, 0], text: `Usage: ${usage}` })
+  if (desc) {
+    ui.div({ padding: [0, 0, 1, 0], text: desc })
+  }
+  if (commands && commands.length > 0) {
+    ui.div({ padding: [0, 0, 1, 0], text: 'Commands:' })
+    commands.forEach((c) => {
+      ui.div({ padding: [0, 0, 1, 2], text: `${c}` })
+    })
+  }
+  if (options && options.length > 0) {
+    ui.div({ padding: [0, 0, 1, 0], text: 'Options:' })
+    options.forEach((o) => {
+      ui.div({ padding: [0, 0, 1, 2], text: `${o}` })
+    })
+  }
+  return ui.toString()
 }
 
 export class Commander {
@@ -110,6 +111,7 @@ export class Commander {
       const usage = `${cliName} ${this.parseResult.command}${curCommand.argument ? ` [${curCommand.argument.key}]` : ''} [flags]`
       const output = commandTemplate(usage, desc, [], option)
       console.log(output)
+      process.exit(0)
     }
     else {
       // show global command + options
@@ -118,8 +120,8 @@ export class Commander {
       const usage = `${cliName} [command] [flags]`
 
       const output = commandTemplate(usage, desc, commands, option)
-
       console.log(output)
+      process.exit(0)
     }
   }
 

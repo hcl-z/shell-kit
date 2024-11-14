@@ -9,12 +9,15 @@ export async function getGitInfo(global = true) {
   const command = (key: string) => global ? ['config', '--get', '--global', key] : ['config', '--get', key]
 
   try {
-    const { stdout: gitName } = await execa('git', command('user.name')) || {}
-    const { stdout: gitEmail } = await execa('git', command('user.email')) || {}
+    const [gitName, gitEmail] = await Promise.all([
+      execa('git', command('user.name')),
+      execa('git', command('user.email')),
+    ])
 
+    console.log(gitName, gitEmail);
     return {
-      user: gitName,
-      email: gitEmail,
+      user: gitName.stdout,
+      email: gitEmail.stdout,
     }
   }
   catch (error) {
