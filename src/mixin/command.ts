@@ -110,6 +110,7 @@ export const CommandMixin = createMixin<CommandMixinType>({
 
       const globalOptions = getOption('globalOptions')
       const commands = getOption('commands')
+
       // 添加全局参数
       Object.values(globalOptions).forEach((option) => {
         yargsInstance = yargsInstance.option(option.name, {
@@ -138,8 +139,6 @@ export const CommandMixin = createMixin<CommandMixinType>({
             return yargs
           },
           handler: (argv) => {
-            console.log('==========================', argv)
-
             const args: Record<string, any> = {}
             const flags: Record<string, any> = {}
             const globalOptions: Record<string, any> = {}
@@ -161,8 +160,6 @@ export const CommandMixin = createMixin<CommandMixinType>({
           },
         })
       })
-      console.log('yargsInstance', yargsInstance)
-
       return yargsInstance.parse()
     },
   }

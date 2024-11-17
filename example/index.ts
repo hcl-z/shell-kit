@@ -1,10 +1,10 @@
-import { ShellKit } from '../dist/index.js'
-import { CommandMixin, Package, Prompt } from '../dist/mixin/index.js'
-import { validateNpmName } from '../dist/utils/index.js'
+import { ShellKit, defineConfig } from '../src/index.js'
+import { CommandMixin, Package, Prompt } from '../src/mixin/index.js'
+import { validateNpmName } from '../src/utils/index.js'
 import prompts from './prompts/index.js'
 // 使用示例
 async function main() {
-  const shell = await ShellKit.create({})
+  const shell = await ShellKit.create(defineConfig({}))
     .then(instance => instance.mixin([Prompt, Package, CommandMixin]))
 
   shell.addCommand({

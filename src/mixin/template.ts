@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import glob from 'fast-glob'
 import type { CreateMixinOptions } from '../utils/mixin'
 import { createMixin } from '../utils/mixin'

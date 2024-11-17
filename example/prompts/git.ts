@@ -1,6 +1,6 @@
-import { definePrompt } from '../../dist/utils/index.js'
+import { definePrompt } from '../../src/utils/index.js'
 
-export default definePrompt(ctx => ([
+export default definePrompt([
   {
     type: 'confirm',
     name: 'git',
@@ -15,4 +15,4 @@ export default definePrompt(ctx => ([
       return `https://github.com/${store.userName}/${store.name}.git`
     },
   },
-]))
+])

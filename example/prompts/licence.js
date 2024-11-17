@@ -1,4 +1,4 @@
-import { definePrompt } from '../../dist/utils/index.js'
+import { definePrompt } from '../../src/utils/index.js'
 
 export default definePrompt({
   name: 'licence',
