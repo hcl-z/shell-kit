@@ -1,4 +1,4 @@
-import { BasePlugin } from '../core/base-plugin'
+import { BasePlugin } from '..'
 import prompts from 'prompts'
 import { ShellKit } from '..'
 

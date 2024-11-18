@@ -1,5 +1,5 @@
 import glob from 'fast-glob'
-import { BasePlugin } from '../core/base-plugin'
+import { BasePlugin } from '..'
 import { debugLog } from '../utils/log'
 
 export class Template extends BasePlugin {

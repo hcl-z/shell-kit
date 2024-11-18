@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { BasePlugin } from '../core/base-plugin'
+import { BasePlugin } from '..'
 import { debugLog } from '../utils/log'
 
 export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'deno' | 'bun'
@@ -10,8 +10,6 @@ export class Package extends BasePlugin {
 
   getPackageManager() {
     return this.pkgManager
-  }
-  addCommand() {
   }
 
   setPkgManager(manager: PackageManager) {

@@ -1,8 +1,7 @@
 import { copy } from 'fs-extra'
-import { BasePlugin } from '../core/base-plugin'
+import { BasePlugin } from '..'
 
-export class FileSystem extends BasePlugin {
-
+export class FsMixin extends BasePlugin {
   _to(from: string) {
     const self = this
     return {

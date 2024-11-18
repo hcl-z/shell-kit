@@ -8,11 +8,12 @@ import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
 import { ExtendPromptObject, Prompt } from './mixin/prompt'
 import { Package } from './mixin/package'
-import { CommandMixin } from './mixin/command'
-import { BasePlugin } from './core/base-plugin'
+import { Command, CommandMixin } from './mixin/command'
 import { validateNpmName } from './utils/validate'
 import npmName from 'npm-name'
 import { getGitInfo } from './utils/fetch'
+import { Template } from './mixin/template'
+import { FsMixin } from './mixin/fs'
 
 /**
  * 将联合类型转换为交叉类型的工具类型
@@ -22,19 +23,28 @@ type UnionToIntersection<U> =
 
 
 /**
- * 插件类型定义
+ * 优化插件类型定义
  */
 export type Plugin = {
   new(ctx: ShellKit): BasePlugin
+} & (abstract new (ctx: ShellKit) => BasePlugin)
+
+/**
+ * 基础插件类
+ */
+export abstract class BasePlugin {
+  constructor(protected ctx: ShellKit) { }
+  [key: string]: any
 }
 
 /**
- * 获取插件实例类型的工具类型
+ * 优化插件实例类型
  */
-type PluginInstance<T extends Plugin> = T extends new (ctx: any) => infer R ? R : never
+type PluginInstance<T extends Plugin> =
+  T extends new (ctx: ShellKit) => infer R ? R : never
 
 /**
- * 合并多个插件的方法类型
+ * 合并插件类型
  */
 type MergePlugins<T extends readonly Plugin[]> = UnionToIntersection<{
   [K in keyof T]: PluginInstance<T[K]>
@@ -43,42 +53,29 @@ type MergePlugins<T extends readonly Plugin[]> = UnionToIntersection<{
 /**
  * ShellKit 配置接口
  */
-export interface ShellKitConfig<
-  P extends readonly Plugin[],
-  S extends Record<string, any> = any,
-  C extends ArgsDetail = ArgsDetail,
-> {
-  /** 插件列表 */
-  plugins?: P
-  /** 全局存储 */
-  store?: S
-  /** 命令配置 */
-  command?: C
-  /** 模板路径 */
+export interface ShellKitConfig {
+  plugins?: Plugin[]
+  store?: Record<string, any>
+  command?: ArgsDetail
   templatePath?: string
-  /** 配置存储键名 */
   key?: string
 }
 
 /**
  * 完整的上下文类型（包含插件方法）
  */
-export type FullContext<
-  P extends readonly Plugin[],
-  S extends Record<string, any> = any,
-> = MergePlugins<P> & { store: S }
+export type ShellkitContext<P extends readonly Plugin[]> = ShellKit & MergePlugins<P>
+
+// 定义默认插件和类型
+const defaultPlugins = [Package, CommandMixin, FsMixin, Template] as const
+type DefaultPluginsType = typeof defaultPlugins
 
 /**
- * ShellKit 核心类
- * 提供插件系统和基础功能
+ * ShellKit 核心类 - 简化泛型
  */
-export class ShellKit<
-  P extends readonly Plugin[] = [],
-  S extends Record<string, any> = any,
-  C extends ArgsDetail = ArgsDetail,
-> {
+export class ShellKit {
   /** 全局存储 */
-  public store: any
+  public store: Record<string, any>
   /** 本地配置存储 */
   public localStore: Configstore | null
   /** 命令行解析器 */
@@ -100,8 +97,8 @@ export class ShellKit<
   /** package.json 内容 */
   pkgJson: PackageJson
 
-  private constructor(private config: ShellKitConfig<P, S, C>) {
-    this.store = createStore(this.config.store || {} as S)
+  private constructor(private config: ShellKitConfig) {
+    this.store = createStore(this.config.store || {})
     this.localStore = null
     this.command = new Commander()
     this.rootPath = process.cwd()
@@ -111,14 +108,17 @@ export class ShellKit<
     this.initStore()
   }
 
-  public static async create<
-    P extends readonly Plugin[] = [],
-    S extends Record<string, any> = any,
-    C extends ArgsDetail = ArgsDetail
-  >(config: ShellKitConfig<P, S, C>): Promise<ShellKit<P, S, C>> {
+  /**
+   * 创建 ShellKit 实例，返回混入了插件的完整类型
+   */
+  public static async create<P extends readonly Plugin[] = []>(
+    config: ShellKitConfig = {}
+  ): Promise<ShellkitContext<[...DefaultPluginsType, ...P]>> {
+    const plugins = [...defaultPlugins, ...(config.plugins || [])] as [...DefaultPluginsType, ...P]
     const instance = new ShellKit(config)
-    await instance.asyncInit()
-    return instance
+    const mixedInstance = instance.mixin(plugins)
+    await mixedInstance.asyncInit()
+    return mixedInstance as ShellkitContext<[...DefaultPluginsType, ...P]>
   }
 
   private async asyncInit() {
@@ -186,19 +186,15 @@ export class ShellKit<
   /**
    * 解析 prompt 配置
    */
-  resolvePrompts(prompts: Array<(ctx: ShellKit<P, S, C>) => any>) {
-    return prompts.map(p => p(this as unknown as ShellKit<P, S, C>)).flat()
+  resolvePrompts(prompts: Array<(ctx: ShellKit) => any>) {
+    return prompts.map(p => p(this as unknown as ShellKit)).flat()
   }
 
   /**
-   * 动态混入插件
-   * @param plugins 要混入的插件数组
-   * @returns 混入插件后的实例，包含新插件的方法
+   * 动态混入插件 - 返回完整类型
    */
-  mixin<NewP extends readonly Plugin[]>(
-    plugins: NewP
-  ): ShellKit<[...P, ...NewP], S, C> & MergePlugins<[...P, ...NewP]> {
-    const newPlugins = plugins.map(Plugin => new Plugin(this as unknown as ShellKit<[], any, ArgsDetail>))
+  private mixin<P extends readonly Plugin[]>(plugins: P): ShellkitContext<P> {
+    const newPlugins = plugins.map(Plugin => new Plugin(this))
     const pluginMethods = newPlugins.reduce((acc, plugin) => {
       const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(plugin))
         .filter(name => name !== 'constructor')
@@ -213,24 +209,50 @@ export class ShellKit<
     }, {})
 
     Object.assign(this, pluginMethods)
-
-    return this as ShellKit<[...P, ...NewP], S, C> & MergePlugins<[...P, ...NewP]>
+    return this as unknown as ShellkitContext<P>
   }
 }
 
 /**
- * 配置辅助函数
- * 用于创建类型安全的配置对象
+ * 简化 definePrompt 的类型定义
  */
-export function defineConfig<
-  P extends readonly Plugin[],
-  S extends Record<string, any> = any,
-  C extends ArgsDetail = ArgsDetail,
->(config: ShellKitConfig<P, S, C>): ShellKitConfig<P, S, C> {
-  return config
+export function definePrompt<P extends Plugin[] = []>(
+  configFactory: (ExtendPromptObject | ExtendPromptObject[])
+    | ((ctx: ShellkitContext<[...DefaultPluginsType, ...P]>) => (ExtendPromptObject | ExtendPromptObject[]))
+) {
+  return (ctx: ShellKit) => {
+    const configs = Array.isArray(configFactory) ? configFactory : [configFactory]
+    const config = configs.map(c => typeof c === 'function' ? c(ctx as any) : c)
+    return config.flat()
+  }
 }
 
+/**
+ * 定义命令的工具函数
+ */
+export function defineCommand<P extends Plugin[] = []>(
+  config: Command | ((ctx: ShellkitContext<[...DefaultPluginsType, ...P]>) => Command)
+) {
+  return (ctx: ShellKit) => {
+    const commandConfig = typeof config === 'function' ? config(ctx as any) : config
+    return commandConfig
+  }
+}
 
+const shellKit = await ShellKit.create({
+  plugins: [Prompt]
+})
+
+defineCommand((ctx) => {
+  return {
+    id: 'test',
+    name: 'test',
+    description: 'test command',
+    callback: () => {
+      console.log('test')
+    }
+  }
+})
 
 
 

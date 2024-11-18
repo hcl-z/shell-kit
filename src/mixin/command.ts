@@ -1,4 +1,4 @@
-import { BasePlugin } from "../core/base-plugin";
+import { BasePlugin } from "..";
 import { ArgDef, defineCommand, runMain } from "citty";
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
