@@ -1,57 +1,77 @@
 import glob from 'fast-glob'
-import { BasePlugin } from '..'
-import { debugLog } from '../utils/log'
+import { createMixin, CreateMixinOptions } from '../utils/mixin'
 
-export class Template extends BasePlugin {
-  _excludeGlob: string[] = []
-  _includeGlob: string[] = []
+type TemplateMixin = CreateMixinOptions<'template', {
+  excludeGlob: string[],
+  includeGlob: string[]
+}, {
+  prefix: string
+  suffix: string
+}, {}, {
+  includeTplFile: (glob: string | string[]) => void,
+  excludeTplFile: (glob: string | string[]) => void,
+  copy: (params: {
+    files?: string[]
+    silent?: boolean
+  }) => void
+}>
 
-  excludeTemFile(glob: string | string[]) {
+export const TemplateMixin = createMixin<TemplateMixin>({
+  key: 'template',
+  options: {
+    excludeGlob: [],
+    includeGlob: []
+  },
+  config: {
+    prefix: '@',
+    suffix: '.tpl'
+  }
+}).extend(({ setOption, getOption, ctx, config }) => ({
+  excludeTplFile(glob: string | string[]) {
+    const excludeGlob = getOption('excludeGlob')
     if (typeof glob === 'string') {
-      this._excludeGlob.push(glob)
+      setOption('excludeGlob', [...excludeGlob, glob])
     }
     else {
-      this._excludeGlob.push(...glob)
+      setOption('excludeGlob', [...excludeGlob, ...glob])
     }
-  }
-
-  includeTemFile(glob: string | string[]) {
+  },
+  includeTplFile(glob: string | string[]) {
+    const includeGlob = getOption('includeGlob')
     if (typeof glob === 'string') {
-      this._includeGlob.push(glob)
+      setOption('includeGlob', [...includeGlob, glob])
     }
     else {
-      this._includeGlob.push(...glob)
+      setOption('includeGlob', [...includeGlob, ...glob])
     }
-  }
-
-  matchFiles() {
-    const templatePath = this.ctx.getTemplatePath()
+  },
+  copy: ({ files = [], silent = true }: {
+    files?: string[]
+    silent?: boolean
+  }) => {
+    const templatePath = ctx.getTemplatePath()
+    const includeGlob = getOption('includeGlob')
+    const excludeGlob = getOption('excludeGlob')
     if (!templatePath) {
       return
     }
-    const include = this._includeGlob.length === 0 ? ['**/*'] : this._includeGlob
-    const files = glob.sync(include, {
-      ignore: this._excludeGlob,
+    if (files) {
+      files.forEach((file) => {
+        const from = ctx.getTemplatePath(file)
+        const to = ctx.getDestPath(file)
+
+      })
+      return
+    }
+    const include = includeGlob.length === 0 ? ['**/*'] : includeGlob
+    const tplFiles = glob.sync(include, {
+      ignore: excludeGlob,
       cwd: templatePath,
-
-    })
-    return files
-  }
-
-  copy({
-    silent = true,
-  }: {
-    silent?: boolean
-  }) {
-    const fileLists = this.matchFiles();
-    (fileLists || []).forEach((file) => {
-      if (file.endsWith('.template')) {
+    }) || [];
+    tplFiles.forEach((file) => {
+      if (file.endsWith(config.suffix)) {
 
       }
-      const from = this.ctx.getTemplatePath(file)
-      const to = this.ctx.getDestPath(file)
-
-
     })
   }
-}
+}))

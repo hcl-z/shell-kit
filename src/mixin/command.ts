@@ -1,5 +1,5 @@
-import { BasePlugin } from "..";
-import { ArgDef, defineCommand, runMain } from "citty";
+import { BasePlugin, ShellKit } from "..";
+import { createMixin, CreateMixinOptions } from "../utils/mixin";
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -48,79 +48,106 @@ class CommandBuilder {
   }
 }
 
-export class CommandMixin extends BasePlugin {
-  private commands: Map<string, CommandBuilder> = new Map();
-  private globalOptions: Map<string, Option> = new Map();
-
-  addCommand(command: Command): CommandMixin {
-    const builder = new CommandBuilder(command);
-    this.commands.set(command.name, builder);
-    return this;
+// 定义 CommandMixin 的类型
+type CommandMixinType = CreateMixinOptions<'command',
+  // options
+  {
+    prefix?: string;
+  },
+  // config
+  {
+    commands: Map<string, CommandBuilder>;
+    globalOptions: Map<string, Option>;
+  },
+  // methods
+  {
+    addCommand: (command: Command) => any;
+    addOption: (option: Option | Option[]) => any;
+    parse: () => void;
   }
+>;
 
-  addOption(option: Option | Option[]): CommandMixin {
-    if (Array.isArray(option)) {
-      option.forEach(item => {
-        this.globalOptions.set(item.name, item);
-      });
-    } else {
-      this.globalOptions.set(option.name, option);
-    }
-    return this;
+// 使用 createMixin 创建 mixin
+export const CommandMixin = createMixin<CommandMixinType>({
+  key: 'command',
+  options: {
+    prefix: ''
+  },
+  config: {
+    commands: new Map(),
+    globalOptions: new Map()
   }
+}).extend(({ ctx, config, getOption }) => {
+  return {
+    addCommand(command: Command) {
+      const builder = new CommandBuilder(command);
+      config.commands.set(command.name, builder);
+      return this;
+    },
 
-  parse() {
-    let yargsInstance = yargs(hideBin(process.argv));
+    addOption(option: Option | Option[]) {
+      if (Array.isArray(option)) {
+        option.forEach(item => {
+          config.globalOptions.set(item.name, item);
+        });
+      } else {
+        config.globalOptions.set(option.name, option);
+      }
+      return this;
+    },
 
-    // 添加全局参数
-    this.globalOptions.forEach((option) => {
-      yargsInstance = yargsInstance.option(option.name, {
-        describe: option.description,
-        demandOption: option.required,
-        default: option.default,
-        alias: option.alias
+    parse() {
+      let yargsInstance = yargs(hideBin(process.argv));
+
+      // 添加全局参数
+      config.globalOptions.forEach((option) => {
+        yargsInstance = yargsInstance.option(option.name, {
+          describe: option.description,
+          demandOption: option.required,
+          default: option.default,
+          alias: option.alias
+        });
       });
-    });
 
-    // 添加子命令
-    this.commands.forEach((ins) => {
-      const cmd = ins.getCommand();
-      yargsInstance = yargsInstance.command({
-        command: cmd.name,
-        describe: cmd.description,
-        builder: (yargs) => {
-          // 添加命令特定的参数
-          cmd.args?.forEach((arg) => {
-            yargs.option(arg.name, {
-              describe: arg.description,
-              demandOption: arg.required,
-              default: arg.default,
-              alias: arg.alias
+      // 添加子命令
+      config.commands.forEach((ins) => {
+        const cmd = ins.getCommand();
+        yargsInstance = yargsInstance.command({
+          command: cmd.name,
+          describe: cmd.description,
+          builder: (yargs) => {
+            cmd.args?.forEach((arg) => {
+              yargs.option(arg.name, {
+                describe: arg.description,
+                demandOption: arg.required,
+                default: arg.default,
+                alias: arg.alias
+              });
             });
-          });
-          return yargs;
-        },
-        handler: (argv) => {
-          const args: Record<string, any> = {};
-          const flags: Record<string, any> = {};
-          const globalOptions: Record<string, any> = {};
+            return yargs;
+          },
+          handler: (argv) => {
+            const args: Record<string, any> = {};
+            const flags: Record<string, any> = {};
+            const globalOptions: Record<string, any> = {};
 
-          // 分离参数
-          Object.entries(argv).forEach(([key, value]) => {
-            if (cmd.args?.some(arg => arg.name === key)) {
-              args[key] = value;
-            } else if (this.globalOptions.has(key)) {
-              globalOptions[key] = value;
-            } else {
-              flags[key] = value;
-            }
-          });
+            // 分离参数
+            Object.entries(argv).forEach(([key, value]) => {
+              if (cmd.args?.some(arg => arg.name === key)) {
+                args[key] = value;
+              } else if (config.globalOptions.has(key)) {
+                globalOptions[key] = value;
+              } else {
+                flags[key] = value;
+              }
+            });
 
-          return cmd.callback(args, flags, globalOptions);
-        }
+            return cmd.callback(args, flags, globalOptions);
+          }
+        });
       });
-    });
 
-    return yargsInstance.parse();
-  }
-}
+      return yargsInstance.parse();
+    }
+  };
+});
