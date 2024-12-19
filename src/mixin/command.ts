@@ -1,50 +1,50 @@
-import { BasePlugin, ShellKit } from "..";
-import { createMixin, CreateMixinOptions } from "../utils/mixin";
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
+import type { CreateMixinOptions } from '../utils/mixin'
+import { createMixin } from '../utils/mixin'
 
 export interface Argument {
-  name: string;
-  description?: string;
-  required?: boolean;
-  default?: any;
-  alias?: string;
+  name: string
+  description?: string
+  required?: boolean
+  default?: any
+  alias?: string
 }
 
 interface Option {
-  name: string;
-  alias?: string;
-  description?: string;
-  type?: 'boolean' | 'string' | 'number';
-  default?: any;
-  required?: boolean;
+  name: string
+  alias?: string
+  description?: string
+  type?: 'boolean' | 'string' | 'number'
+  default?: any
+  required?: boolean
 }
 
 export interface Command {
-  id: string;
-  name: string;
-  description?: string;
-  args?: Argument[];
-  callback: (args: Record<string, any>, flags: Record<string, any>, globalOptions: Record<string, any>) => void;
+  id: string
+  name: string
+  description?: string
+  args?: Argument[]
+  callback: (args: Record<string, any>, flags: Record<string, any>, globalOptions: Record<string, any>) => void
 }
 
 // 新增用于链式调用的命令构建器
 class CommandBuilder {
-  private command: Command;
+  private command: Command
   constructor(command: Command) {
-    this.command = command;
+    this.command = command
   }
 
   addArgument(arg: Argument): CommandBuilder {
     if (!this.command.args) {
-      this.command.args = [];
+      this.command.args = []
     }
-    this.command.args.push(arg);
-    return this;
+    this.command.args.push(arg)
+    return this
   }
 
   getCommand(): Command {
-    return this.command;
+    return this.command
   }
 }
 
@@ -52,52 +52,52 @@ class CommandBuilder {
 type CommandMixinType = CreateMixinOptions<'command',
   // options
   {
-    prefix?: string;
+    prefix?: string
   },
   // config
   {
-    commands: Map<string, CommandBuilder>;
-    globalOptions: Map<string, Option>;
+    commands: Map<string, CommandBuilder>
+    globalOptions: Map<string, Option>
   },
   // methods
   {
-    addCommand: (command: Command) => any;
-    addOption: (option: Option | Option[]) => any;
-    parse: () => void;
-  }
->;
+    addCommand: (command: Command) => any
+    addOption: (option: Option | Option[]) => any
+    parse: () => void
+  }>
 
 // 使用 createMixin 创建 mixin
 export const CommandMixin = createMixin<CommandMixinType>({
   key: 'command',
   options: {
-    prefix: ''
+    prefix: '',
   },
   config: {
     commands: new Map(),
-    globalOptions: new Map()
-  }
-}).extend(({ ctx, config, getOption }) => {
+    globalOptions: new Map(),
+  },
+}).extend(({ config }) => {
   return {
     addCommand(command: Command) {
-      const builder = new CommandBuilder(command);
-      config.commands.set(command.name, builder);
-      return this;
+      const builder = new CommandBuilder(command)
+      config.commands.set(command.name, builder)
+      return this
     },
 
     addOption(option: Option | Option[]) {
       if (Array.isArray(option)) {
-        option.forEach(item => {
-          config.globalOptions.set(item.name, item);
-        });
-      } else {
-        config.globalOptions.set(option.name, option);
+        option.forEach((item) => {
+          config.globalOptions.set(item.name, item)
+        })
       }
-      return this;
+      else {
+        config.globalOptions.set(option.name, option)
+      }
+      return this
     },
 
     parse() {
-      let yargsInstance = yargs(hideBin(process.argv));
+      let yargsInstance = yargs(hideBin(process.argv))
 
       // 添加全局参数
       config.globalOptions.forEach((option) => {
@@ -105,13 +105,13 @@ export const CommandMixin = createMixin<CommandMixinType>({
           describe: option.description,
           demandOption: option.required,
           default: option.default,
-          alias: option.alias
-        });
-      });
+          alias: option.alias,
+        })
+      })
 
       // 添加子命令
       config.commands.forEach((ins) => {
-        const cmd = ins.getCommand();
+        const cmd = ins.getCommand()
         yargsInstance = yargsInstance.command({
           command: cmd.name,
           describe: cmd.description,
@@ -121,33 +121,35 @@ export const CommandMixin = createMixin<CommandMixinType>({
                 describe: arg.description,
                 demandOption: arg.required,
                 default: arg.default,
-                alias: arg.alias
-              });
-            });
-            return yargs;
+                alias: arg.alias,
+              })
+            })
+            return yargs
           },
           handler: (argv) => {
-            const args: Record<string, any> = {};
-            const flags: Record<string, any> = {};
-            const globalOptions: Record<string, any> = {};
+            const args: Record<string, any> = {}
+            const flags: Record<string, any> = {}
+            const globalOptions: Record<string, any> = {}
 
             // 分离参数
             Object.entries(argv).forEach(([key, value]) => {
               if (cmd.args?.some(arg => arg.name === key)) {
-                args[key] = value;
-              } else if (config.globalOptions.has(key)) {
-                globalOptions[key] = value;
-              } else {
-                flags[key] = value;
+                args[key] = value
               }
-            });
+              else if (config.globalOptions.has(key)) {
+                globalOptions[key] = value
+              }
+              else {
+                flags[key] = value
+              }
+            })
 
-            return cmd.callback(args, flags, globalOptions);
-          }
-        });
-      });
+            return cmd.callback(args, flags, globalOptions)
+          },
+        })
+      })
 
-      return yargsInstance.parse();
-    }
-  };
-});
+      return yargsInstance.parse()
+    },
+  }
+})

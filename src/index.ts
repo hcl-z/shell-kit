@@ -6,8 +6,8 @@ import { createStore } from './utils/store'
 import { debugLog } from './utils/log'
 import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
-import { CreateMixinOptions, Mixin } from './utils/mixin'
-import { CommandMixin, FsMixin, PromptMixin, TestMixin } from './mixin'
+import type { Mixin } from './utils/mixin'
+import { CommandMixin, FsMixin, TestMixin } from './mixin'
 
 type UnionToIntersection<U> =
   (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
@@ -19,7 +19,6 @@ type ExtractMixinMethods<T extends Mixin<any>> = T extends Mixin<infer R> ? {
 type InferMixinMethods<T extends readonly Mixin<any>[]> = UnionToIntersection<{
   [K in keyof T]: ExtractMixinMethods<T[K]>
 }[number]>
-
 
 interface LocalInfo {
   user: string
@@ -44,10 +43,10 @@ interface ShellKitConfig<M extends readonly Mixin<any>[]> {
 
 type ShellkitContext<M extends readonly Mixin<any>[]> = ShellKit<M> &
   InferMixinMethods<M> &
-{ [K in M[number]['key']]: ReturnType<NonNullable<M[number]['methodsBuilder']>> }
+  { [K in M[number]['key']]: ReturnType<NonNullable<M[number]['methodsBuilder']>> }
 
 /**
- *  core class 
+ *  core class
  */
 export class ShellKit<M extends readonly Mixin<any>[] = []> {
   public readonly store: Record<string, any>
@@ -110,7 +109,7 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
   }
 
   private initMixins(mixins: M): void {
-    mixins.forEach(mixin => {
+    mixins.forEach((mixin) => {
       const { key, options, config } = mixin
       this.mixinStore[key] = { options, config }
 
@@ -125,7 +124,7 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
         ctx: this,
         getOption: getMixinOption.bind(this, key),
         setOption: setMixinOption.bind(this, key),
-        config: this.mixinStore[key].config
+        config: this.mixinStore[key].config,
       }
 
       const mixinMethods = mixin.methodsBuilder?.(methodContext)
@@ -133,7 +132,7 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
 
       if (mixinMethods) {
         Object.assign(this, {
-          [key]: mixinMethods
+          [key]: mixinMethods,
         })
       }
       if (globalMixinMethods) {
@@ -143,18 +142,11 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
   }
 }
 
-export const createShellKit = <M extends readonly Mixin<any>[]>(
-  config: ShellKitConfig<M>
-): ShellkitContext<M> => {
+export function createShellKit<M extends readonly Mixin<any>[]>(config: ShellKitConfig<M>): ShellkitContext<M> {
   return new ShellKit(config) as ShellkitContext<M>
 }
 
 const shellKit = createShellKit({
-  mixins: [TestMixin.configure({ name: "hcl" }), FsMixin, CommandMixin]
+  mixins: [TestMixin.configure({ name: 'hcl' }), FsMixin, CommandMixin],
 })
-
-
-
-
-
-
+shellKit.fs.copyFromDest

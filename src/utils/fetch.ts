@@ -1,4 +1,3 @@
-import process from 'node:process'
 import { execa } from 'execa'
 import pocate from 'pacote'
 import { Log } from './log'
@@ -14,7 +13,7 @@ export async function getGitInfo(global = true) {
       execa('git', command('user.email')),
     ])
 
-    console.log(gitName, gitEmail);
+    console.log(gitName, gitEmail)
     return {
       user: gitName.stdout,
       email: gitEmail.stdout,

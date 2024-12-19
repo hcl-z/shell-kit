@@ -1,9 +1,6 @@
-import { ShellKit } from "..";
-import { ExtendPromptObject } from "../mixin/prompt";
+import type { ShellKit } from '..'
 
 export abstract class BasePlugin {
-    constructor(protected ctx: ShellKit) { }
-    [key: string]: any
+  constructor(protected ctx: ShellKit) { }
+  [key: string]: any
 }
-
-

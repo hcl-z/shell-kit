@@ -12,4 +12,3 @@ export async function openWithCode(path: string) {
     }
   }
 }
-

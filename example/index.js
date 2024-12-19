@@ -1,5 +1,5 @@
 import { ShellKit, defineConfig } from '../dist/index.js'
-import { Prompt, Package, CommandMixin } from '../dist/mixin/index.js'
+import { CommandMixin, Package, Prompt } from '../dist/mixin/index.js'
 import { validateNpmName } from '../dist/utils/index.js'
 import prompts from './prompts/index.js'
 // 使用示例
@@ -12,8 +12,8 @@ async function main() {
     name: 'build',
     description: '构建项目',
     callback: (...rest) => {
-      console.log('build', rest);
-    }
+      console.log('build', rest)
+    },
   })
 
   shell.addCommand({
@@ -21,28 +21,28 @@ async function main() {
     name: 'serve',
     description: '启动服务器',
     callback: (...rest) => {
-      console.log('serve', rest);
-    }
+      console.log('serve', rest)
+    },
   })
 
   await shell.parse()
 
-  console.log(shell.resolvePrompts(prompts));
+  console.log(shell.resolvePrompts(prompts))
   await shell.prompt([{
     name: 'name',
     type: 'text',
     message: '请输入项目名称',
     validate: validateNpmName(),
     callback: (value) => {
-      console.log('name', value);
-    }
+      console.log('name', value)
+    },
   }, {
     name: 'description',
     message: 'Description',
     type: 'text',
     callback: (value) => {
-      console.log('description', value);
-    }
+      console.log('description', value)
+    },
   }, {
     name: 'userName',
     message: 'Author\'s Name',
@@ -53,15 +53,13 @@ async function main() {
     name: 'repository',
     message: 'Repository',
     initial: (prev, store) => {
-      return `https://github.com/${prev}/${store?.['name']}`
+      return `https://github.com/${prev}/${store?.name}`
     },
-  },
-  {
+  }, {
     name: 'keywords',
     message: 'keywords(split by space)',
     initial: '',
-  },
-  {
+  }, {
     name: 'pkgManager',
     type: 'select',
     message: 'which Pkg Manager do you want to use?',
@@ -77,9 +75,7 @@ async function main() {
       value: 'pnpm',
     }],
     store: true,
-  },
-  ...shell.resolvePrompts(prompts)
-  ])
+  }, ...shell.resolvePrompts(prompts)])
 }
 
 main()

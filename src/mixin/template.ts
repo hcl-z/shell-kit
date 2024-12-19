@@ -1,15 +1,16 @@
 import glob from 'fast-glob'
-import { createMixin, CreateMixinOptions } from '../utils/mixin'
+import type { CreateMixinOptions } from '../utils/mixin'
+import { createMixin } from '../utils/mixin'
 
 type TemplateMixin = CreateMixinOptions<'template', {
-  excludeGlob: string[],
+  excludeGlob: string[]
   includeGlob: string[]
 }, {
   prefix: string
   suffix: string
 }, {}, {
-  includeTplFile: (glob: string | string[]) => void,
-  excludeTplFile: (glob: string | string[]) => void,
+  includeTplFile: (glob: string | string[]) => void
+  excludeTplFile: (glob: string | string[]) => void
   copy: (params: {
     files?: string[]
     silent?: boolean
@@ -20,12 +21,12 @@ export const TemplateMixin = createMixin<TemplateMixin>({
   key: 'template',
   options: {
     excludeGlob: [],
-    includeGlob: []
+    includeGlob: [],
   },
   config: {
     prefix: '@',
-    suffix: '.tpl'
-  }
+    suffix: '.tpl',
+  },
 }).extend(({ setOption, getOption, ctx, config }) => ({
   excludeTplFile(glob: string | string[]) {
     const excludeGlob = getOption('excludeGlob')
@@ -59,7 +60,6 @@ export const TemplateMixin = createMixin<TemplateMixin>({
       files.forEach((file) => {
         const from = ctx.getTemplatePath(file)
         const to = ctx.getDestPath(file)
-
       })
       return
     }
@@ -67,11 +67,11 @@ export const TemplateMixin = createMixin<TemplateMixin>({
     const tplFiles = glob.sync(include, {
       ignore: excludeGlob,
       cwd: templatePath,
-    }) || [];
+    }) || []
     tplFiles.forEach((file) => {
       if (file.endsWith(config.suffix)) {
 
       }
     })
-  }
+  },
 }))

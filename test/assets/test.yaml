@@ -3,11 +3,11 @@
 # 定义一个服务配置
 service:
   name: example-service
-  environment: 
+  environment:
     - name: NODE_ENV
-      value: "production"
+      value: production
     - name: DB_HOST
-      value: "localhost"
+      value: localhost
   ports:
     - protocol: TCP
       port: 8080
@@ -26,10 +26,10 @@ database:
 
 # 定义一个应用配置
 application:
-  version: "1.0.0"
+  version: 1.0.0
   description: Example application for YAML configuration
   dependencies:
     - name: express
-      version: "^4.17.1"
+      version: ^4.17.1
     - name: mongoose
-      version: "^6.0.14"
+      version: ^6.0.14

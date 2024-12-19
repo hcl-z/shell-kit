@@ -1,11 +1,7 @@
 import { resolve } from 'node:path'
 
-import type { MockInstance } from 'vitest'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { execa } from 'execa'
-import type { Template } from '../../src/mixin/template'
-import { ShellKit, ShellKitCore } from '../../src'
-import { Package } from '../../src/mixin/package'
+import { beforeEach, describe, vi } from 'vitest'
+import { ShellKit } from '../../src'
 import type { ArgsDetail } from '../../src/utils/argsParse'
 import { Prompt } from '../../src/mixin/prompt'
 

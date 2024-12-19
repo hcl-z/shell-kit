@@ -21,6 +21,23 @@
     "pompt",
     "tool"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./mixin": {
+      "types": "./dist/mixin/index.d.ts",
+      "import": "./dist/mixin/index.mjs",
+      "require": "./dist/mixin/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.mjs",
+      "require": "./dist/utils/index.js"
+    }
+  },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -75,22 +92,5 @@
     "tsup": "^7.2.0",
     "typescript": "^5.2.2",
     "vitest": "^2.0.4"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
-    "./mixin": {
-      "types": "./dist/mixin/index.d.ts",
-      "import": "./dist/mixin/index.mjs",
-      "require": "./dist/mixin/index.js"
-    },
-    "./utils": {
-      "types": "./dist/utils/index.d.ts",
-      "import": "./dist/utils/index.mjs",
-      "require": "./dist/utils/index.js"
-    }
   }
 }

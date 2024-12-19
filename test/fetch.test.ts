@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { MockedFunction } from 'vitest'
 import { execa } from 'execa'
 import { getGitInfo, getLastestVersion, getPackageInfo } from '../src/utils/fetch'
 

@@ -1,8 +1,7 @@
-import type { MockInstance } from 'vitest'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { execa } from 'execa'
 import { Package } from '../../src/mixin/package'
-import { ShellKit, ShellKitCore } from '../../src'
+import { ShellKit } from '../../src'
 import type { ArgsDetail } from '../../src/utils/argsParse'
 
 describe('package Manager', () => {

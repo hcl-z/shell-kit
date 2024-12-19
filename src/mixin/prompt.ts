@@ -1,13 +1,14 @@
 import prompts from 'prompts'
-import { ShellKit } from '..'
-import { createMixin, CreateMixinOptions } from '../utils/mixin'
+import type { ShellKit } from '..'
+import type { CreateMixinOptions } from '../utils/mixin'
+import { createMixin } from '../utils/mixin'
 
 export interface ExtendPromptObject extends Partial<prompts.PromptObject<string>> {
   store?: boolean
   callback?: (ctx: ShellKit, prompt: ExtendPromptObject, answer: any, answers: any) => void
 }
 
-const formatPromptObject = (promptObject: ExtendPromptObject | ExtendPromptObject[], store: Record<string, any>) => {
+function formatPromptObject(promptObject: ExtendPromptObject | ExtendPromptObject[], store: Record<string, any>) {
   const format = (item: ExtendPromptObject) => {
     if (typeof item.name === 'string' && item.store && store?.[item.name] && !item.initial) {
       item.initial = store[item.name]
@@ -21,7 +22,8 @@ const formatPromptObject = (promptObject: ExtendPromptObject | ExtendPromptObjec
     for (const item of promptObject) {
       format(item)
     }
-  } else {
+  }
+  else {
     format(promptObject)
   }
   return promptObject
@@ -39,7 +41,7 @@ export const PromptMixin = createMixin<PromptMixinOptions>({
   options: {
     store: {},
     promptAnswers: {},
-  }
+  },
 }).extendGlobalMethods(({ ctx, config, getOption, setOption }) => ({
   async prompt(promptObject: ExtendPromptObject | ExtendPromptObject[]) {
     const lastPromptStore = ctx?.localStore?.get('prompt')
@@ -58,5 +60,5 @@ export const PromptMixin = createMixin<PromptMixinOptions>({
     const response = await prompts(formatedPromptObject as prompts.PromptObject<string>[], { onSubmit })
     setOption('promptAnswers', response)
     return response
-  }
+  },
 }))
