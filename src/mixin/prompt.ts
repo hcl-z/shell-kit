@@ -1,3 +1,4 @@
+import type { PromptType } from 'prompts'
 import prompts from 'prompts'
 import type { ShellKit } from '..'
 import type { CreateMixinOptions } from '../utils/mixin'
@@ -5,19 +6,39 @@ import { createMixin } from '../utils/mixin'
 
 export interface ExtendPromptObject extends Partial<prompts.PromptObject<string>> {
   store?: boolean
+  when?: (lastAnswers: any, answers: any) => boolean
   callback?: (ctx: ShellKit, prompt: ExtendPromptObject, answer: any, answers: any) => void
 }
 
+function getType(item: ExtendPromptObject) {
+  if (item.when === undefined) {
+    return item.type ?? 'text' as PromptType
+  }
+  else {
+    return (prev: any, answer: any, prompt: any) => {
+      if (typeof item.when === 'function') {
+        return item.when(prev, answer) ? (item.type ?? 'text') : null
+      }
+      else {
+        if (typeof item.type === 'function') {
+          return item.type(prev, answer, prompt)
+        }
+        else {
+          return item.type ?? 'text'
+        }
+      }
+    }
+  }
+}
 function formatPromptObject(promptObject: ExtendPromptObject | ExtendPromptObject[], store: Record<string, any>) {
   const format = (item: ExtendPromptObject) => {
     if (typeof item.name === 'string' && item.store && store?.[item.name] && !item.initial) {
       item.initial = store[item.name]
     }
-    if (item.type === undefined) {
-      item.type = 'text'
-    }
+    item.type = getType(item) as typeof item.type
     return item
   }
+
   if (Array.isArray(promptObject)) {
     for (const item of promptObject) {
       format(item)
@@ -32,7 +53,7 @@ function formatPromptObject(promptObject: ExtendPromptObject | ExtendPromptObjec
 type PromptMixinOptions = CreateMixinOptions<'prompt', {
   store: Record<string, any>
   promptAnswers: Record<string, any>
-}, {}, {}, {
+}, object, object, {
   prompt: (promptObject: ExtendPromptObject | ExtendPromptObject[]) => Promise<Record<string, any>>
 }>
 
@@ -42,7 +63,7 @@ export const PromptMixin = createMixin<PromptMixinOptions>({
     store: {},
     promptAnswers: {},
   },
-}).extendGlobalMethods(({ ctx, config, getOption, setOption }) => ({
+}).extendGlobalMethods(({ ctx, setOption }) => ({
   async prompt(promptObject: ExtendPromptObject | ExtendPromptObject[]) {
     const lastPromptStore = ctx?.localStore?.get('prompt')
     const formatedPromptObject = formatPromptObject(promptObject, lastPromptStore)

@@ -4,9 +4,9 @@ const octokit = new Octokit({ auth: `personal-access-token123` })
 
 // Compare: https://docs.github.com/en/rest/reference/users#get-the-authenticated-user
 
-function validateRepoAuth(name: string) {
+// function validateRepoAuth(name: string) {
 
-}
+// }
 
 export async function getRepo({ owner, repo }: {
   owner: string

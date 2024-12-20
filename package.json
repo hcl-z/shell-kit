@@ -92,5 +92,10 @@
     "tsup": "^7.2.0",
     "typescript": "^5.2.2",
     "vitest": "^2.0.4"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "prompts@2.4.2": "patches/prompts@2.4.2.patch"
+    }
   }
 }

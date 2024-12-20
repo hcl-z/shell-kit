@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { readJSON } from './utils/fs'
+import { readJSON } from './fs'
 
 export function findNearestPackageJson(scriptPath: string = process.cwd()) {
   let currentDir = scriptPath

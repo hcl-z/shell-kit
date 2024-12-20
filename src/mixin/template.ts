@@ -2,13 +2,13 @@ import glob from 'fast-glob'
 import type { CreateMixinOptions } from '../utils/mixin'
 import { createMixin } from '../utils/mixin'
 
-type TemplateMixin = CreateMixinOptions<'template', {
+type TemplateMixinOption = CreateMixinOptions<'template', {
   excludeGlob: string[]
   includeGlob: string[]
 }, {
   prefix: string
   suffix: string
-}, {}, {
+}, object, {
   includeTplFile: (glob: string | string[]) => void
   excludeTplFile: (glob: string | string[]) => void
   copy: (params: {
@@ -17,7 +17,7 @@ type TemplateMixin = CreateMixinOptions<'template', {
   }) => void
 }>
 
-export const TemplateMixin = createMixin<TemplateMixin>({
+export const TemplateMixin = createMixin<TemplateMixinOption>({
   key: 'template',
   options: {
     excludeGlob: [],
@@ -27,7 +27,7 @@ export const TemplateMixin = createMixin<TemplateMixin>({
     prefix: '@',
     suffix: '.tpl',
   },
-}).extend(({ setOption, getOption, ctx, config }) => ({
+}).extendGlobalMethods(({ setOption, getOption, ctx, config }) => ({
   excludeTplFile(glob: string | string[]) {
     const excludeGlob = getOption('excludeGlob')
     if (typeof glob === 'string') {
@@ -69,9 +69,9 @@ export const TemplateMixin = createMixin<TemplateMixin>({
       cwd: templatePath,
     }) || []
     tplFiles.forEach((file) => {
-      if (file.endsWith(config.suffix)) {
+      // if (file.endsWith(config.suffix)) {
 
-      }
+      // }
     })
   },
 }))

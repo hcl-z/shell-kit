@@ -11,6 +11,7 @@ type FsMixinType = CreateMixinOptions<'fs', object, object, object, {
    * @param path 文件路径
    */
   copyFromDest: (path?: string) => void
+  test: (path?: string) => void
 }>
 
 function to(ctx: ShellKit<any>, from: string) {
@@ -57,6 +58,9 @@ export const FsMixin = createMixin<FsMixinType>({
     copyFromDest(path = '') {
       const from = ctx.getDestPath(path)
       return to(ctx, from)
+    },
+    test(path = '') {
+      console.log('test', path)
     },
   }
 })

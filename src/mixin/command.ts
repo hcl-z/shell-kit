@@ -1,3 +1,4 @@
+import process from 'node:process'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import type { CreateMixinOptions } from '../utils/mixin'
@@ -21,7 +22,6 @@ interface Option {
 }
 
 export interface Command {
-  id: string
   name: string
   description?: string
   args?: Argument[]
@@ -52,13 +52,13 @@ class CommandBuilder {
 type CommandMixinType = CreateMixinOptions<'command',
   // options
   {
-    prefix?: string
+    commands: Record<string, CommandBuilder>
+    globalOptions: Record<string, Option>
   },
   // config
   {
-    commands: Map<string, CommandBuilder>
-    globalOptions: Map<string, Option>
-  },
+    prefix?: string
+  }, object,
   // methods
   {
     addCommand: (command: Command) => any
@@ -70,37 +70,48 @@ type CommandMixinType = CreateMixinOptions<'command',
 export const CommandMixin = createMixin<CommandMixinType>({
   key: 'command',
   options: {
-    prefix: '',
+    commands: {},
+    globalOptions: {},
   },
   config: {
-    commands: new Map(),
-    globalOptions: new Map(),
+    prefix: '',
   },
-}).extend(({ config }) => {
+}).extendGlobalMethods(({ getOption, setOption }) => {
   return {
     addCommand(command: Command) {
+      const commands = getOption('commands')
       const builder = new CommandBuilder(command)
-      config.commands.set(command.name, builder)
+      setOption('commands', { ...commands, [command.name]: builder })
       return this
     },
 
     addOption(option: Option | Option[]) {
+      const globalOptions = getOption('globalOptions')
       if (Array.isArray(option)) {
         option.forEach((item) => {
-          config.globalOptions.set(item.name, item)
+          globalOptions[item.name] = item
         })
       }
       else {
-        config.globalOptions.set(option.name, option)
+        globalOptions[option.name] = option
       }
+      console.log('globalOptions', globalOptions)
+
+      setOption('globalOptions', globalOptions)
       return this
     },
 
     parse() {
       let yargsInstance = yargs(hideBin(process.argv))
 
+      yargsInstance.help('help')
+        .alias('help', 'h')
+        .version('version').alias('version', 'V')
+
+      const globalOptions = getOption('globalOptions')
+      const commands = getOption('commands')
       // 添加全局参数
-      config.globalOptions.forEach((option) => {
+      Object.values(globalOptions).forEach((option) => {
         yargsInstance = yargsInstance.option(option.name, {
           describe: option.description,
           demandOption: option.required,
@@ -110,7 +121,7 @@ export const CommandMixin = createMixin<CommandMixinType>({
       })
 
       // 添加子命令
-      config.commands.forEach((ins) => {
+      Object.values(commands).forEach((ins) => {
         const cmd = ins.getCommand()
         yargsInstance = yargsInstance.command({
           command: cmd.name,
@@ -127,6 +138,8 @@ export const CommandMixin = createMixin<CommandMixinType>({
             return yargs
           },
           handler: (argv) => {
+            console.log('==========================', argv)
+
             const args: Record<string, any> = {}
             const flags: Record<string, any> = {}
             const globalOptions: Record<string, any> = {}
@@ -136,7 +149,7 @@ export const CommandMixin = createMixin<CommandMixinType>({
               if (cmd.args?.some(arg => arg.name === key)) {
                 args[key] = value
               }
-              else if (config.globalOptions.has(key)) {
+              else if (globalOptions[key]) {
                 globalOptions[key] = value
               }
               else {
@@ -148,6 +161,7 @@ export const CommandMixin = createMixin<CommandMixinType>({
           },
         })
       })
+      console.log('yargsInstance', yargsInstance)
 
       return yargsInstance.parse()
     },

@@ -1,13 +1,17 @@
 import { resolve } from 'node:path'
+import process from 'node:process'
 import Configstore from 'configstore'
+import type { Command } from 'commander'
 import type { PackageJson } from '../types/package'
-import { findNearestPackageJson } from './utils'
 import { createStore } from './utils/store'
 import { debugLog } from './utils/log'
 import type { ArgsDetail } from './utils/argsParse'
 import { Commander } from './utils/argsParse'
-import type { Mixin } from './utils/mixin'
-import { CommandMixin, FsMixin, TestMixin } from './mixin'
+import type { Mixin, MixinMethodParams } from './utils/mixin'
+import { CommandMixin, FsMixin, PackageMixin, PromptMixin } from './mixin'
+import { TemplateMixin } from './mixin/template'
+import type { ExtendPromptObject } from './mixin/prompt'
+import { findNearestPackageJson, validateEmail } from './utils'
 
 type UnionToIntersection<U> =
   (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
@@ -16,8 +20,16 @@ type ExtractMixinMethods<T extends Mixin<any>> = T extends Mixin<infer R> ? {
   [K in R['key']]: R['methods']
 } : never
 
+type ExtractMixinGlobalMethods<T extends Mixin<any>> = T extends Mixin<infer R> ? {
+  [K in keyof R['globalMethods']]: R['globalMethods'][K]
+} : never
+
 type InferMixinMethods<T extends readonly Mixin<any>[]> = UnionToIntersection<{
   [K in keyof T]: ExtractMixinMethods<T[K]>
+}[number]>
+
+type InferMixinGlobalMethods<T extends readonly Mixin<any>[]> = UnionToIntersection<{
+  [K in keyof T]: ExtractMixinGlobalMethods<T[K]>
 }[number]>
 
 interface LocalInfo {
@@ -41,9 +53,7 @@ interface ShellKitConfig<M extends readonly Mixin<any>[]> {
   suffix?: string
 }
 
-type ShellkitContext<M extends readonly Mixin<any>[]> = ShellKit<M> &
-  InferMixinMethods<M> &
-  { [K in M[number]['key']]: ReturnType<NonNullable<M[number]['methodsBuilder']>> }
+type ShellkitContext<M extends readonly Mixin<any>[]> = ShellKit<M> & InferMixinMethods<M> & InferMixinGlobalMethods<M>
 
 /**
  *  core class
@@ -110,7 +120,7 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
 
   private initMixins(mixins: M): void {
     mixins.forEach((mixin) => {
-      const { key, options, config } = mixin
+      const { key, options, config, methodsBuilder, globalMethodsBuilder } = mixin
       this.mixinStore[key] = { options, config }
 
       const getMixinOption = (optionKey: string) => {
@@ -122,13 +132,13 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
 
       const methodContext = {
         ctx: this,
-        getOption: getMixinOption.bind(this, key),
-        setOption: setMixinOption.bind(this, key),
+        getOption: getMixinOption.bind(this),
+        setOption: setMixinOption.bind(this),
         config: this.mixinStore[key].config,
-      }
+      } as MixinMethodParams<typeof config, typeof options>
 
-      const mixinMethods = mixin.methodsBuilder?.(methodContext)
-      const globalMixinMethods = mixin.globalMethodsBuilder?.(methodContext)
+      const mixinMethods = methodsBuilder?.(methodContext)
+      const globalMixinMethods = globalMethodsBuilder?.(methodContext)
 
       if (mixinMethods) {
         Object.assign(this, {
@@ -142,11 +152,44 @@ export class ShellKit<M extends readonly Mixin<any>[] = []> {
   }
 }
 
+/**
+ * 简化 definePrompt 的类型定义
+ */
+export function definePrompt<M extends Mixin<any>[] = []>(
+  configFactory: (ExtendPromptObject | ExtendPromptObject[])
+    | ((ctx: ShellkitContext<M>) => (ExtendPromptObject | ExtendPromptObject[])),
+) {
+  return (ctx: ShellKit) => {
+    const configs = Array.isArray(configFactory) ? configFactory : [configFactory]
+    const config = configs.map(c => typeof c === 'function' ? c(ctx as any) : c)
+    return config.flat()
+  }
+}
+
+/**
+ * 定义命令的工具函数
+ */
+export function defineCommand<M extends Mixin<any>[] = []>(
+  config: Command | ((ctx: ShellkitContext<M>) => Command),
+) {
+  return (ctx: ShellKit) => {
+    const commandConfig = typeof config === 'function' ? config(ctx as any) : config
+    return commandConfig
+  }
+}
+
 export function createShellKit<M extends readonly Mixin<any>[]>(config: ShellKitConfig<M>): ShellkitContext<M> {
   return new ShellKit(config) as ShellkitContext<M>
 }
 
 const shellKit = createShellKit({
-  mixins: [TestMixin.configure({ name: 'hcl' }), FsMixin, CommandMixin],
+  mixins: [FsMixin, CommandMixin, PromptMixin, PackageMixin, TemplateMixin],
 })
-shellKit.fs.copyFromDest
+
+shellKit.addCommand({
+  description: '测试命令',
+  name: 'test',
+  callback: (ctx) => {
+    console.log('test', ctx)
+  },
+})

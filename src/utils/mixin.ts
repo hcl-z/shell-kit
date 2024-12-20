@@ -5,7 +5,7 @@ type OptionalMixinOptions<T extends CreateMixinOptions> = Omit<T, 'key' | 'metho
 
 type MixinOptions<T extends CreateMixinOptions> = RequiredMixinOptions<T> & Partial<OptionalMixinOptions<T>>
 
-interface MixinMethodParams<C extends Record<string, any>, O extends Record<string, any>> {
+export interface MixinMethodParams<C extends Record<string, any>, O extends Record<string, any>> {
   ctx: ShellKit<any>
   config: C
   getOption: <K extends keyof O>(key: K) => O[K]
@@ -26,7 +26,7 @@ export interface CreateMixinOptions<
   globalMethods: G
 }
 
-type MethodsBuilder<T extends CreateMixinOptions, K extends keyof T = any> = (params: MixinMethodParams<T['config'], T['options']>) => T[K]
+type MethodsBuilder<T extends CreateMixinOptions, K extends keyof T> = (params: MixinMethodParams<T['config'], T['options']>) => T[K]
 
 export type Mixin<T extends CreateMixinOptions = CreateMixinOptions> = MixinClass<T>
 
@@ -34,8 +34,8 @@ class MixinClass<T extends CreateMixinOptions> {
   key: T['key'] = null
   options: T['options'] = {}
   config: T['config'] = {}
-  methodsBuilder: MethodsBuilder<T> = () => ({})
-  globalMethodsBuilder: MethodsBuilder<T> = () => ({} as T['globalMethods'])
+  methodsBuilder: MethodsBuilder<T, 'methods'> = () => ({})
+  globalMethodsBuilder: MethodsBuilder<T, 'globalMethods'> = () => ({})
   constructor(mixin: MixinOptions<T>) {
     if (!mixin.key) {
       throw new Error('Mixin key is required')
@@ -60,6 +60,6 @@ class MixinClass<T extends CreateMixinOptions> {
     return this
   }
 }
-export function createMixin<T extends CreateMixinOptions = CreateMixinOptions>(mixin: MixinOptions<T>) {
-  return new MixinClass(mixin) as unknown as Mixin<T>
+export function createMixin<T extends CreateMixinOptions>(mixin: MixinOptions<T>) {
+  return new MixinClass<T>(mixin) as unknown as Mixin<T>
 }
