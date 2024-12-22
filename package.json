@@ -68,6 +68,7 @@
     "execa": "^9.3.0",
     "fast-glob": "^3.3.2",
     "fs-extra": "^11.2.0",
+    "handlebars": "^4.7.8",
     "minimist": "^1.2.8",
     "npm-name": "^8.0.0",
     "octokit": "^4.0.2",

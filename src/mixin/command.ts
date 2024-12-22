@@ -21,68 +21,69 @@ interface Option {
   required?: boolean
 }
 
+interface CommandParams {
+  args: Record<string, any>
+  options: Record<string, any>
+  globalOptions: Record<string, any>
+}
 export interface Command {
   name: string
   description?: string
-  args?: Argument[]
-  callback: (args: Record<string, any>, flags: Record<string, any>, globalOptions: Record<string, any>) => void
+  alias?: string
+  callback: (params: CommandParams) => void
 }
 
-// 新增用于链式调用的命令构建器
 class CommandBuilder {
-  private command: Command
+  command: Command
+  args: Argument[] = []
+  options: Option[] = []
   constructor(command: Command) {
     this.command = command
   }
 
-  addArgument(arg: Argument): CommandBuilder {
-    if (!this.command.args) {
-      this.command.args = []
+  addOptions(option: Option | Option[]): CommandBuilder {
+    if (!this.options) {
+      this.options = []
     }
-    this.command.args.push(arg)
+    this.options.push(...Array.isArray(option) ? option : [option])
     return this
   }
 
-  getCommand(): Command {
-    return this.command
+  addArguments(args: Argument | Argument[]): CommandBuilder {
+    if (!this.args) {
+      this.args = []
+    }
+    this.args.push(...Array.isArray(args) ? args : [args])
+    return this
   }
 }
 
 // 定义 CommandMixin 的类型
-type CommandMixinType = CreateMixinOptions<'command',
-  // options
-  {
-    commands: Record<string, CommandBuilder>
-    globalOptions: Record<string, Option>
-  },
-  // config
-  {
-    prefix?: string
-  }, object,
-  // methods
-  {
-    addCommand: (command: Command) => any
-    addOption: (option: Option | Option[]) => any
-    parse: () => void
-  }>
+type CommandMixinType = CreateMixinOptions<'command', {
+  commands: Record<string, CommandBuilder>
+  globalOptions: Record<string, Option>
+}, {
+  locale?: string
+  usage?: string
+}, object, {
+  addCommand: (command: Command) => CommandBuilder
+  addOption: (option: Option | Option[]) => any
+  parse: () => void
+}>
 
-// 使用 createMixin 创建 mixin
 export const CommandMixin = createMixin<CommandMixinType>({
   key: 'command',
   options: {
     commands: {},
     globalOptions: {},
   },
-  config: {
-    prefix: '',
-  },
-}).extendGlobalMethods(({ getOption, setOption }) => {
+}).extendGlobalMethods(({ getOption, setOption, config }) => {
   return {
     addCommand(command: Command) {
       const commands = getOption('commands')
       const builder = new CommandBuilder(command)
       setOption('commands', { ...commands, [command.name]: builder })
-      return this
+      return builder
     },
 
     addOption(option: Option | Option[]) {
@@ -95,25 +96,26 @@ export const CommandMixin = createMixin<CommandMixinType>({
       else {
         globalOptions[option.name] = option
       }
-      console.log('globalOptions', globalOptions)
-
       setOption('globalOptions', globalOptions)
       return this
     },
 
     parse() {
-      let yargsInstance = yargs(hideBin(process.argv))
-
-      yargsInstance.help('help')
-        .alias('help', 'h')
-        .version('version').alias('version', 'V')
+      const yargsInstance = yargs(hideBin(process.argv))
 
       const globalOptions = getOption('globalOptions')
       const commands = getOption('commands')
 
-      // 添加全局参数
+      if (config.locale) {
+        yargsInstance.locale(config.locale)
+      }
+
+      if (config.usage) {
+        yargsInstance.usage(config.usage)
+      }
+
       Object.values(globalOptions).forEach((option) => {
-        yargsInstance = yargsInstance.option(option.name, {
+        yargsInstance.option(option.name, {
           describe: option.description,
           demandOption: option.required,
           default: option.default,
@@ -121,14 +123,16 @@ export const CommandMixin = createMixin<CommandMixinType>({
         })
       })
 
-      // 添加子命令
       Object.values(commands).forEach((ins) => {
-        const cmd = ins.getCommand()
-        yargsInstance = yargsInstance.command({
+        const cmd = ins.command
+        const options = ins.options
+        const args = ins.args
+
+        yargsInstance.command({
           command: cmd.name,
           describe: cmd.description,
-          builder: (yargs) => {
-            cmd.args?.forEach((arg) => {
+          builder: (yargs: yargs.Argv) => {
+            args.forEach((arg) => {
               yargs.option(arg.name, {
                 describe: arg.description,
                 demandOption: arg.required,
@@ -136,30 +140,39 @@ export const CommandMixin = createMixin<CommandMixinType>({
                 alias: arg.alias,
               })
             })
+            options.forEach((option) => {
+              yargs.positional(option.name, {
+                describe: option.description,
+                demandOption: option.required,
+                default: option.default,
+                alias: option.alias,
+              })
+            })
             return yargs
           },
-          handler: (argv) => {
-            const args: Record<string, any> = {}
-            const flags: Record<string, any> = {}
-            const globalOptions: Record<string, any> = {}
+          handler: (argv: Record<string, any>) => {
+            const params = Object.entries(argv).reduce((params, [key, value]) => {
+              if (globalOptions[key]) {
+                params.globalOptions[key] = value
+              }
+              else if (options.find(option => option.name === key)) {
+                params.options[key] = value
+              }
+              else if (args.find(arg => arg.name === key)) {
+                params.args[key] = value
+              }
+              return params
+            }, {
+              args: {},
+              options: {},
+              globalOptions: {},
+            } as CommandParams)
 
-            // 分离参数
-            Object.entries(argv).forEach(([key, value]) => {
-              if (cmd.args?.some(arg => arg.name === key)) {
-                args[key] = value
-              }
-              else if (globalOptions[key]) {
-                globalOptions[key] = value
-              }
-              else {
-                flags[key] = value
-              }
-            })
-
-            return cmd.callback(args, flags, globalOptions)
+            return cmd?.callback(params)
           },
         })
       })
+
       return yargsInstance.parse()
     },
   }

@@ -1,5 +1,4 @@
 export { PromptMixin } from './prompt'
 export { PackageMixin } from './package'
 export { CommandMixin } from './command'
-export { FsMixin } from './fs'
-export {TemplateMixin} from './template'
+export { TemplateMixin } from './template'

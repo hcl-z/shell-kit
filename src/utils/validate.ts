@@ -32,7 +32,7 @@ function validateEmail(value: string, errMsg?: string) {
 }
 
 function validateUrl(value: string, errMsg?: string) {
-  const valid = /^(https?:\/\/)?[^\s/$.?#].\S*$/.test(value)
+  const valid = /^https?:\/\/[^\s/$.?#].\S*$/.test(value)
   if (!valid)
     return errMsg || 'Please enter a valid URL.'
   return true
