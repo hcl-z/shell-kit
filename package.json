@@ -1,5 +1,5 @@
 {
-  "name": "shell-kit",
+  "name": "spark",
   "type": "module",
   "version": "1.0.0",
   "description": "tools to help make a cli app",
@@ -50,7 +50,6 @@
     "release": "bumpp",
     "dev": "tsup --watch",
     "build": "tsup",
-    "start": "npx tsx example/index.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "docs:dev": "vitepress dev docs",
