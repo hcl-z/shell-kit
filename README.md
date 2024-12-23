@@ -1,5 +1,5 @@
 <h1 align="center">
-Welcome to shell-kit 👋
+Ciny
 <br>
 <a href="https://npm.im/shell-kit">
   <img src="https://badgen.net/npm/v/shell-kit">
@@ -13,23 +13,79 @@ Welcome to shell-kit 👋
 </h1>
 
 ><p align="center">
-tools to help make a cli app
+tool chain for node-cli 
 </p>
+🚧 in progress 🚧
 
 ## Install
 
 ```sh
-npm install
+npm install ciny
 ```
 
 ## Usage
 
 ```sh
-npm run dev
+const shellkit = createShellKit({
+  mixins: [CommandMixin, PromptMixin, TemplateMixin, PackageMixin],
+})
+
+shellkit.addCommand({
+  name: 'init',
+  description: 'init the project',
+  callback: () => {
+    shellkit.prompt({
+      name: 'name',
+      message: 'What is the project name?',
+    })
+  },
+})
+
+await shellkit.parse()
+shellkit.copyFromTemplate().toDest()
+
 ```
 
-## Run tests
+## Api
+### createShellKit
 
-```sh
-npm run test
-```
+- description: create a shellkit instance
+- params:
+  - config: ShellKitConfig
+- return: ShellkitContext
+
+## Mixin
+> mixin methods to the shellkit instance
+
+### commandMixin
+- description: mixin command methods to the shellkit instance
+- config:
+  - locale: string
+  - usage: string
+- methods:
+  - addCommand: add a command to the shellkit instance
+  - addOption: add a option to the command
+  - parse: parse the command and options
+
+### promptMixin
+
+- description: mixin prompt methods to the shellkit instance
+- methods:
+  - prompt: prompt the user for input
+
+### templateMixin
+
+- description: mixin template methods to the shellkit instance
+- methods:
+  - copyFromRoot: copy a file from the root directory
+  - copyFromTemplate: copy a file from the template directory
+  - copyFromDest: copy a file from the destination directory
+
+### packageMixin
+
+- description: mixin package methods to the shellkit instance
+- methods:
+  - setPkgManager: set the package manager
+  - runScript: run a script with the package manager
+  - install: install a package with the package manager
+
