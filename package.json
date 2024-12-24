@@ -1,7 +1,7 @@
 {
   "name": "ciny",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "tools to help make a cli app",
   "author": "hcl-z 1401859664@qq.com",
   "license": "MIT",
